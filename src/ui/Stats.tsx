@@ -7,8 +7,6 @@ interface StatsProps {
 }
 
 export function Stats({ world }: StatsProps) {
-  const males = world.entities.filter(e => e.gender === 'male').length;
-  const females = world.entities.filter(e => e.gender === 'female').length;
   const mating = world.entities.filter(e => e.state === 'mating').length;
   const hunting = world.entities.filter(e => e.state === 'hunting').length;
   const gathering = world.entities.filter(e => e.state === 'gathering').length;
