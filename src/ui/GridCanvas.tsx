@@ -1,8 +1,6 @@
 import { useRef, useEffect } from 'react';
 import type { WorldState, Entity } from '../engine/types';
 
-const MALE_COLOR = '#7aa2f7';
-const FEMALE_COLOR = '#f7768e';
 const GRID_BG = '#1a1b26';
 const GRID_LINE = '#2a2b36';
 
@@ -12,8 +10,8 @@ interface GridCanvasProps {
 }
 
 function entityColor(entity: Entity): string {
-  // TODO: will be driven by genes/RGB later
-  return entity.gender === 'male' ? MALE_COLOR : FEMALE_COLOR;
+  const [r, g, b] = entity.color;
+  return `rgb(${r},${g},${b})`;
 }
 
 export function GridCanvas({ world, size }: GridCanvasProps) {

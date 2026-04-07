@@ -1,4 +1,4 @@
-import type { Entity, Position, WorldState } from './types';
+import type { Entity, Position, WorldState, RGB } from './types';
 import { MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE } from './types';
 import { randomStep } from './movement';
 
@@ -18,6 +18,20 @@ function randomMaxAge(): number {
 
 function isReproductive(e: Entity): boolean {
   return e.age >= MIN_REPRODUCTIVE_AGE && e.age <= MAX_REPRODUCTIVE_AGE;
+}
+
+const BASE_COLORS: RGB[] = [
+  [255, 0, 0],   // red
+  [0, 255, 0],   // green
+  [0, 0, 255],   // blue
+];
+
+function mixColors(a: RGB, b: RGB): RGB {
+  return [
+    Math.min(255, Math.round((a[0] + b[0]) / 2)),
+    Math.min(255, Math.round((a[1] + b[1]) / 2)),
+    Math.min(255, Math.round((a[2] + b[2]) / 2)),
+  ];
 }
 
 function createOccupancyGrid(gridSize: number, entities: Entity[]): number[][] {
@@ -54,6 +68,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
       state: 'idle',
       age: Math.floor(Math.random() * 31), // 0-30
       maxAge: randomMaxAge(),
+      color: BASE_COLORS[i % 3],
     });
   }
 
@@ -105,6 +120,7 @@ export function tick(state: WorldState): WorldState {
         state: 'idle',
         age: 0,
         maxAge: randomMaxAge(),
+        color: mixColors(male.color, female.color),
       };
       babies.push(baby);
       grid[birthPos.y][birthPos.x]++;

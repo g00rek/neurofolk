@@ -6,6 +6,8 @@ export interface Position {
   y: number;
 }
 
+export type RGB = [number, number, number];
+
 export interface Entity {
   id: string;
   position: Position;
@@ -13,6 +15,7 @@ export interface Entity {
   state: EntityState;
   age: number;
   maxAge: number;
+  color: RGB;
 }
 
 export const MIN_REPRODUCTIVE_AGE = 18;
