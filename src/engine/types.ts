@@ -39,7 +39,7 @@ export interface Animal {
   reproTimer: number; // ticks until next reproduction attempt
 }
 
-export const ANIMAL_REPRO_INTERVAL = 30; // ticks between reproduction attempts
+export const ANIMAL_REPRO_INTERVAL = 10; // ticks between reproduction attempts
 export const ANIMAL_REPRO_RANGE = 2;     // max animals on nearby tiles to reproduce
 export const ANIMAL_MAX = 60;            // carrying capacity
 
