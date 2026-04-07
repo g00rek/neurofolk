@@ -64,7 +64,7 @@ export interface Animal {
   reproTimer: number; // ticks until next reproduction attempt
 }
 
-export const ANIMAL_REPRO_INTERVAL = 10; // ticks between reproduction attempts
+export const ANIMAL_REPRO_INTERVAL = 60; // ~6 months between reproduction
 export const ANIMAL_REPRO_RANGE = 2;     // max animals on nearby tiles to reproduce
 export const ANIMAL_MAX = 40;            // carrying capacity
 export const ANIMAL_FLEE_RANGE = 1;      // animals flee humans within this range
@@ -76,8 +76,8 @@ export interface Plant {
   growTimer: number; // ticks until mature
 }
 
-export const PLANT_GROW_TIME = 20; // ticks to mature
-export const FOREST_REGROW_TIME = 30; // ticks for chopped forest to regrow
+export const PLANT_GROW_TIME = 60; // ~2 months to mature
+export const FOREST_REGROW_TIME = 360; // ~3 years for chopped forest to regrow
 export const FIGHT_MIN_AGE = 16;
 export const CHOPPING_DURATION = 3;
 export const BUILDING_DURATION = 5;
@@ -93,12 +93,12 @@ export interface House {
 // Population
 export const MIN_REPRODUCTIVE_AGE = 18;
 export const MAX_REPRODUCTIVE_AGE = 50;
-export const TICKS_PER_YEAR = 10;
+export const TICKS_PER_YEAR = 120; // 1 tick = 1 day, 10 days/month, 12 months/year
 export const BASE_PHEROMONE_RANGE = 1; // added to perception for mate sensing
 
 // Actions
 export const MATING_DURATION = 1;
-export const PREGNANCY_DURATION = 15; // ~1.5 years
+export const PREGNANCY_DURATION = 90; // 9 months
 export const FIGHTING_DURATION = 3;
 export const HUNTING_DURATION = 3;
 export const GATHERING_DURATION = 2;
@@ -106,7 +106,7 @@ export const GATHERING_DURATION = 2;
 // Energy
 export const ENERGY_MAX = 100;
 export const ENERGY_START = 80;
-export const ENERGY_DRAIN_INTERVAL = 3; // lose 1 energy every N ticks
+export const ENERGY_DRAIN_INTERVAL = 10; // lose 1 energy every 10 days (~monthly)
 export const ENERGY_MEAT = 50;
 export const ENERGY_PLANT = 35;
 export const ENERGY_MATING_MIN = 30;
@@ -117,7 +117,7 @@ export const CHILD_AGE = 10; // children don't lose energy (years)
 export const BASE_FOOD_SENSE_RANGE = 3; // added to perception for food sensing
 export const ANIMAL_COUNT = 15;
 export const PLANT_COUNT = 30;
-export const PLANT_RESPAWN_INTERVAL = 5; // 1 new plant every N ticks
+export const PLANT_RESPAWN_INTERVAL = 15; // new plant every ~half month
 
 // Biomes
 export type Biome = 'plains' | 'forest' | 'mountain' | 'water';

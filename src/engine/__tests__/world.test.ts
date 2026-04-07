@@ -210,13 +210,13 @@ describe('mating', () => {
     expect(e2?.state).toBe('idle');
   });
 
-  it('entities on same tile with opposite gender enter mating state (male has meat)', () => {
+  it('entities on same tile with opposite gender enter mating state (male has home)', () => {
     const world: WorldState = {
       gridSize: 30,
       tick: 0,
-      animals: [], plants: [], log: [], houses: [], biomes: plainsBiomes(30), villages: [],
+      animals: [], plants: [], log: [], houses: [{ id: 'h1', position: { x: 5, y: 5 }, tribe: 0, ownerId: 'e1' }], biomes: plainsBiomes(30), villages: [],
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', stateTimer: 0, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 3, tribe: 0 as const, carryingWood: false },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', stateTimer: 0, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 3, tribe: 0 as const, carryingWood: false, homeId: 'h1' },
         { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'idle', stateTimer: 0, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0, tribe: 0 as const, carryingWood: false },
       ],
     };
@@ -260,7 +260,7 @@ describe('mating', () => {
     expect(next.entities.every(e => e.state === 'fighting')).toBe(true);
   });
 
-  it('fight resolves after timer — one male dies', () => {
+  it('fight resolves after timer — both survive with energy loss', () => {
     const world: WorldState = {
       gridSize: 30,
       tick: 0,
@@ -271,9 +271,10 @@ describe('mating', () => {
       ],
     };
     const next = tick(world);
-    expect(next.entities.length).toBe(1);
-    expect(next.entities[0].gender).toBe('male');
-    expect(next.entities[0].state).toBe('idle');
+    // Non-lethal: both survive but lose energy
+    expect(next.entities.length).toBe(2);
+    expect(next.entities.every(e => e.state === 'idle')).toBe(true);
+    expect(next.entities.every(e => e.energy < 80)).toBe(true);
   });
 
   it('mating resolves: male goes idle, female becomes pregnant', () => {

@@ -392,18 +392,22 @@ function detectInteractions(
         }
       }
     }
+    // Mating: male with house + his partner on same tile + both idle + reproductive + not pregnant
     if (!fightStarted && idleMales.length >= 1 && idleFemales.length >= 1) {
       const male = idleMales.find(e => {
+        if (!isReproductive(e) || newActionIds.has(e.id) || !e.homeId) return false;
         const minEnergy = matingEnergyCost(e.tribe, allEntities);
-        return isReproductive(e) && !newActionIds.has(e.id) && e.energy >= minEnergy && !!e.homeId;
+        return e.energy >= minEnergy;
       });
-      const female = idleFemales.find(e => {
-        const minEnergy = matingEnergyCost(e.tribe, allEntities);
-        return isReproductive(e) && e.energy >= minEnergy;
-      });
-      if (male && female) {
-        newActionIds.add(male.id);
-        newActionIds.add(female.id);
+      if (male) {
+        // Find his partner (female living in his house)
+        const female = idleFemales.find(e =>
+          isReproductive(e) && e.homeId === male.homeId && e.state === 'idle'
+        );
+        if (female) {
+          newActionIds.add(male.id);
+          newActionIds.add(female.id);
+        }
       }
     }
 
