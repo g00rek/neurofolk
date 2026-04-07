@@ -23,7 +23,7 @@ export function Stats({ world }: StatsProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       <div style={panelStyle}>
-        <div style={labelStyle}>Populacja</div>
+        <div style={labelStyle}>Population</div>
         <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
           {world.entities.length}
         </div>
@@ -33,33 +33,33 @@ export function Stats({ world }: StatsProps) {
           <span style={{ color: '#f7768e' }}>&#9792; {females}</span>
         </div>
         <div style={{ fontSize: '11px', color: '#bb9af7', marginTop: '4px', visibility: mating > 0 ? 'visible' : 'hidden' }}>
-          &#10084; {Math.floor(mating / 2)} par
+          &#10084; {Math.floor(mating / 2)} pairs
         </div>
       </div>
       <div style={panelStyle}>
-        <div style={labelStyle}>Rok / Tura</div>
+        <div style={labelStyle}>Year / Tick</div>
         <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{year}</div>
-        <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>tura {world.tick}</div>
+        <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>tick {world.tick}</div>
       </div>
       <div style={panelStyle}>
-        <div style={labelStyle}>Wiek / Energia</div>
-        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{avgAge} lat</div>
+        <div style={labelStyle}>Age / Energy</div>
+        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{avgAge} yrs</div>
         <div style={{ fontSize: '14px', color: '#9ece6a', marginTop: '2px' }}>&#9889; {avgEnergy}</div>
       </div>
       <div style={panelStyle}>
-        <div style={labelStyle}>Zasoby</div>
+        <div style={labelStyle}>Resources</div>
         <div style={{ fontSize: '12px' }}>
-          <span style={{ color: '#8d6e63' }}>&#9670; {world.animals.length} zwierząt</span>
+          <span style={{ color: '#8d6e63' }}>&#9670; {world.animals.length} animals</span>
         </div>
         <div style={{ fontSize: '12px', marginTop: '2px' }}>
-          <span style={{ color: '#4caf50' }}>&#9679; {world.plants.length} roślin</span>
+          <span style={{ color: '#4caf50' }}>&#9679; {world.plants.length} plants</span>
         </div>
       </div>
       <div style={panelStyle}>
-        <div style={labelStyle}>Aktywności</div>
+        <div style={labelStyle}>Activities</div>
         <div style={{ fontSize: '11px' }}>
-          <div>&#127993; {hunting} poluje</div>
-          <div>&#127807; {gathering} zbiera</div>
+          <div>&#127993; {hunting} hunting</div>
+          <div>&#127807; {gathering} gathering</div>
         </div>
       </div>
     </div>

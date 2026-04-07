@@ -8,13 +8,13 @@ interface ControlsProps {
 export function Controls({ running, speed, onToggle, onSpeedChange }: ControlsProps) {
   return (
     <div style={panelStyle}>
-      <div style={labelStyle}>Kontrolki</div>
+      <div style={labelStyle}>Controls</div>
       <button onClick={onToggle} style={buttonStyle(running)}>
         {running ? '⏸ Pause' : '▶ Play'}
       </button>
       <div style={{ marginTop: '12px' }}>
         <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>
-          Szybkość: {speed}ms
+          Speed: {speed}ms
         </div>
         <input
           type="range"

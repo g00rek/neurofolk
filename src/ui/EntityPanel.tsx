@@ -12,7 +12,7 @@ export function EntityPanel({ entity, onClose }: EntityPanelProps) {
   return (
     <div style={panelStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={labelStyle}>Osobnik</div>
+        <div style={labelStyle}>Entity</div>
         <button onClick={onClose} style={closeStyle}>✕</button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
@@ -22,37 +22,37 @@ export function EntityPanel({ entity, onClose }: EntityPanelProps) {
         </span>
       </div>
       <div style={rowStyle}>
-        <span style={dimStyle}>Stan:</span>
+        <span style={dimStyle}>State:</span>
         <span>{stateLabel(entity.state)}</span>
       </div>
       <div style={rowStyle}>
-        <span style={dimStyle}>Wiek:</span>
-        <span>{ageInYears(entity)} lat</span>
+        <span style={dimStyle}>Age:</span>
+        <span>{ageInYears(entity)} yrs</span>
       </div>
       <div style={rowStyle}>
-        <span style={dimStyle}>Energia:</span>
+        <span style={dimStyle}>Energy:</span>
         <span style={{ color: entity.energy < 40 ? '#f7768e' : '#9ece6a' }}>
           {Math.round(entity.energy)}
         </span>
       </div>
-      <div style={{ ...labelStyle, marginTop: '8px' }}>Cechy</div>
+      <div style={{ ...labelStyle, marginTop: '8px' }}>Traits</div>
       <div style={rowStyle}>
-        <span style={dimStyle}>Siła:</span>
+        <span style={dimStyle}>Strength:</span>
         <span>{entity.traits.strength}</span>
         <Bar value={entity.traits.strength} max={10} color="#f7768e" />
       </div>
       <div style={rowStyle}>
-        <span style={dimStyle}>Prędkość:</span>
+        <span style={dimStyle}>Speed:</span>
         <span>{entity.traits.speed}</span>
         <Bar value={entity.traits.speed} max={3} color="#7aa2f7" />
       </div>
       <div style={rowStyle}>
-        <span style={dimStyle}>Percepcja:</span>
+        <span style={dimStyle}>Perception:</span>
         <span>{entity.traits.perception}</span>
         <Bar value={entity.traits.perception} max={5} color="#9ece6a" />
       </div>
       <div style={rowStyle}>
-        <span style={dimStyle}>Pozycja:</span>
+        <span style={dimStyle}>Position:</span>
         <span>{entity.position.x},{entity.position.y}</span>
       </div>
     </div>
@@ -69,11 +69,11 @@ function Bar({ value, max, color }: { value: number; max: number; color: string 
 
 function stateLabel(state: string): string {
   switch (state) {
-    case 'idle': return 'Bezczynny';
-    case 'mating': return '❤ Kopulacja';
-    case 'fighting': return '⚔ Walka';
-    case 'hunting': return '🏹 Polowanie';
-    case 'gathering': return '🌿 Zbieranie';
+    case 'idle': return 'Idle';
+    case 'mating': return '❤ Mating';
+    case 'fighting': return '⚔ Fighting';
+    case 'hunting': return '🏹 Hunting';
+    case 'gathering': return '🌿 Gathering';
     default: return state;
   }
 }

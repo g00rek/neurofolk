@@ -73,11 +73,11 @@ export function App() {
   return (
     <div style={containerStyle}>
       <h1 style={{ margin: '0 0 16px', fontSize: '20px', color: '#ccc' }}>
-        Symulator Życia
+        Life Simulator
       </h1>
       {extinct && (
         <div style={{ background: '#f7768e22', border: '1px solid #f7768e', borderRadius: '4px', padding: '12px 20px', marginBottom: '16px', fontSize: '16px' }}>
-          Cywilizacja wymarła w roku {Math.floor(world.tick / 10)} (tura {world.tick})
+          Civilization extinct in year {Math.floor(world.tick / 10)} (tick {world.tick})
         </div>
       )}
       <div style={layoutStyle}>
