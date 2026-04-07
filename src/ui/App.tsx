@@ -9,7 +9,7 @@ const CANVAS_SIZE = 900;
 
 export function App() {
   const [world, setWorld] = useState<WorldState>(() =>
-    createWorld({ gridSize: 30, entityCount: 20 })
+    createWorld({ gridSize: 30, entityCount: 60 })
   );
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState(300);
