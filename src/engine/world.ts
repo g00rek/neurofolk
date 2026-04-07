@@ -20,8 +20,11 @@ function generateId(prefix = 'e'): string {
   return `${prefix}-${nextId++}`;
 }
 
-function randomMaxAge(): number {
-  return (60 + Math.floor(Math.random() * 21)) * TICKS_PER_YEAR;
+function randomMaxAge(fertility: number = 1.0): number {
+  // Higher fertility = shorter life (trade-off)
+  const baseAge = 60 + Math.floor(Math.random() * 21); // 60-80
+  const adjusted = Math.round(baseAge / fertility); // fertility 2.0 → 30-40 yrs, 0.5 → 120-160 yrs
+  return clamp(adjusted, 40, 120) * TICKS_PER_YEAR;
 }
 
 export function ageInYears(e: Entity): number {
@@ -47,25 +50,53 @@ function clamp(v: number, min: number, max: number): number {
 
 function randomTraits(): Traits {
   return {
-    strength: Math.floor(Math.random() * 5) + 3,   // 3-7
-    speed: Math.floor(Math.random() * 2) + 1,       // 1-2
-    perception: Math.floor(Math.random() * 3) + 1,  // 1-3
+    strength: Math.floor(Math.random() * 5) + 3,           // 3-7
+    speed: Math.floor(Math.random() * 2) + 1,               // 1-2
+    perception: Math.floor(Math.random() * 3) + 1,          // 1-3
+    metabolism: +(0.8 + Math.random() * 0.4).toFixed(2),     // 0.8-1.2
+    aggression: Math.floor(Math.random() * 6) + 2,          // 2-7
+    fertility: +(0.8 + Math.random() * 0.4).toFixed(2),     // 0.8-1.2
   };
+}
+
+function inheritTrait(a: number, b: number, min: number, max: number, mutation: number): number {
+  const avg = (a + b) / 2;
+  return clamp(+(avg + (Math.random() * mutation * 2 - mutation)).toFixed(2), min, max);
 }
 
 function inheritTraits(a: Traits, b: Traits): Traits {
-  return {
-    strength: clamp(Math.round((a.strength + b.strength) / 2 + (Math.random() * 2 - 1)), 1, 10),
-    speed: clamp(Math.round((a.speed + b.speed) / 2 + (Math.random() * 0.6 - 0.3)), 1, 3),
-    perception: clamp(Math.round((a.perception + b.perception) / 2 + (Math.random() * 1.4 - 0.7)), 1, 5),
+  // Rare dramatic mutation: 3% chance of one trait being extreme
+  const dramaticMutation = Math.random() < 0.03;
+  const traits: Traits = {
+    strength: inheritTrait(a.strength, b.strength, 1, 10, 1),
+    speed: inheritTrait(a.speed, b.speed, 1, 3, 0.3),
+    perception: inheritTrait(a.perception, b.perception, 1, 5, 0.7),
+    metabolism: inheritTrait(a.metabolism, b.metabolism, 0.5, 2.0, 0.1),
+    aggression: inheritTrait(a.aggression, b.aggression, 0, 10, 1),
+    fertility: inheritTrait(a.fertility, b.fertility, 0.5, 2.0, 0.1),
   };
+  // Round integer traits
+  traits.strength = Math.round(traits.strength);
+  traits.speed = Math.round(traits.speed);
+  traits.perception = Math.round(traits.perception);
+  traits.aggression = Math.round(traits.aggression);
+
+  if (dramaticMutation) {
+    const traitKeys: (keyof Traits)[] = ['strength', 'speed', 'perception', 'aggression'];
+    const key = traitKeys[Math.floor(Math.random() * traitKeys.length)];
+    const maxVals: Record<string, number> = { strength: 10, speed: 3, perception: 5, aggression: 10 };
+    // Push to extreme (high or low)
+    traits[key] = Math.random() < 0.5 ? 1 : maxVals[key];
+  }
+
+  return traits;
 }
 
 function traitEnergyDrain(t: Traits): number {
-  // Baseline = strength 3 + speed 1 + perception 1 = 5
+  // Higher strength/speed/perception cost energy, metabolism reduces drain
   const total = t.strength + t.speed * 3 + t.perception;
-  const baseline = 3 + 3 + 1; // 7
-  return Math.max(0, (total - baseline) * TRAIT_ENERGY_COST);
+  const baseline = 3 + 3 + 1;
+  return Math.max(0, (total - baseline) * TRAIT_ENERGY_COST * t.metabolism);
 }
 
 function foodSenseRange(e: Entity): number {
@@ -82,17 +113,12 @@ function fightWinner(a: Entity, b: Entity): Entity {
   return Math.random() * total < a.traits.strength ? a : b;
 }
 
-const BASE_COLORS: RGB[] = [
-  [255, 0, 0],
-  [0, 255, 0],
-  [0, 0, 255],
-];
-
-function mixColors(a: RGB, b: RGB): RGB {
+// Color derived from traits: R=strength, G=perception, B=speed
+function traitsToColor(t: Traits): RGB {
   return [
-    Math.min(255, Math.round((a[0] + b[0]) / 2)),
-    Math.min(255, Math.round((a[1] + b[1]) / 2)),
-    Math.min(255, Math.round((a[2] + b[2]) / 2)),
+    clamp(Math.round((t.strength / 10) * 255), 30, 255),
+    clamp(Math.round((t.perception / 5) * 255), 30, 255),
+    clamp(Math.round((t.speed / 3) * 255), 30, 255),
   ];
 }
 
@@ -140,6 +166,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
   const entities: Entity[] = [];
 
   for (let i = 0; i < entityCount; i++) {
+    const traits = randomTraits();
     entities.push({
       id: generateId('e'),
       position: randomPos(gridSize),
@@ -147,10 +174,10 @@ export function createWorld(options: CreateWorldOptions): WorldState {
       state: 'idle',
       stateTimer: 0,
       age: Math.floor(Math.random() * 31) * TICKS_PER_YEAR,
-      maxAge: randomMaxAge(),
-      color: BASE_COLORS[i % 3],
+      maxAge: randomMaxAge(traits.fertility),
+      color: traitsToColor(traits),
       energy: ENERGY_START,
-      traits: randomTraits(),
+      traits,
       meat: 0,
     });
   }
@@ -200,11 +227,18 @@ function detectInteractions(
     const idleMales = group.filter(e => e.gender === 'male' && e.state === 'idle' && !skipIds.has(e.id));
     const idleFemales = group.filter(e => e.gender === 'female' && e.state === 'idle' && !skipIds.has(e.id));
 
-    // Only adult males fight (age >= FIGHT_MIN_AGE)
+    // Only adult males fight (age >= FIGHT_MIN_AGE), and only if aggressive enough
     const fightableMales = idleMales.filter(e => ageInYears(e) >= FIGHT_MIN_AGE);
     if (fightableMales.length >= 2) {
-      newActionIds.add(fightableMales[0].id);
-      newActionIds.add(fightableMales[1].id);
+      // Each male decides: fight or flee based on aggression (roll vs aggression/10)
+      const [m1, m2] = fightableMales;
+      const m1Fights = Math.random() < m1.traits.aggression / 10;
+      const m2Fights = Math.random() < m2.traits.aggression / 10;
+      if (m1Fights && m2Fights) {
+        newActionIds.add(m1.id);
+        newActionIds.add(m2.id);
+      }
+      // If one or both flee, no fight — they just move away next tick
     } else if (idleMales.length >= 1 && idleFemales.length >= 1) {
       const male = idleMales.find(e =>
         isReproductive(e) && !newActionIds.has(e.id) && e.energy >= ENERGY_MATING_MIN && e.meat > 0
@@ -229,7 +263,9 @@ function detectInteractions(
     if (e.gender === 'male' && otherActionMale) {
       return { ...e, state: 'fighting' as const, stateTimer: FIGHTING_DURATION };
     }
-    return { ...e, state: 'mating' as const, stateTimer: MATING_DURATION };
+    // Higher fertility = faster mating
+    const matingTime = Math.max(1, Math.round(MATING_DURATION / e.traits.fertility));
+    return { ...e, state: 'mating' as const, stateTimer: matingTime };
   });
 }
 
@@ -305,6 +341,7 @@ export function tick(state: WorldState): WorldState {
           ? free[Math.floor(Math.random() * free.length)]
           : { ...male.position };
 
+        const babyTraits = inheritTraits(male.traits, female.traits);
         babies.push({
           id: generateId('e'),
           position: birthPos,
@@ -312,10 +349,10 @@ export function tick(state: WorldState): WorldState {
           state: 'idle',
           stateTimer: 0,
           age: 0,
-          maxAge: randomMaxAge(),
-          color: mixColors(male.color, female.color),
+          maxAge: randomMaxAge(babyTraits.fertility),
+          color: traitsToColor(babyTraits),
           energy: ENERGY_START,
-          traits: inheritTraits(male.traits, female.traits),
+          traits: babyTraits,
           meat: 0,
         });
         const baby = babies[babies.length - 1];
@@ -525,19 +562,23 @@ export function tick(state: WorldState): WorldState {
       if (!target && isReproductive(entity) && !isHungry(entity)
           && entity.energy >= ENERGY_MATING_MIN) {
         const oppositeGender = entity.gender === 'male' ? 'female' : 'male';
-        let bestDist = senseMate + 1;
         let bestPos: Position | null = null;
 
+        let bestScore = -1;
         for (const other of entities) {
           if (other.gender !== oppositeGender || other.state !== 'idle' || !isReproductive(other)) continue;
           if (other.energy < ENERGY_MATING_MIN) continue;
-          // Females only attracted to males with meat
           if (entity.gender === 'female' && other.meat <= 0) continue;
-          // Males need meat to mate
           if (entity.gender === 'male' && entity.meat <= 0) continue;
           const d = manhattan(entity.position, other.position);
-          if (d > 0 && d <= senseMate && d < bestDist) {
-            bestDist = d;
+          if (d <= 0 || d > senseMate) continue;
+          // Sexual selection: females prefer strong males with lots of meat
+          const attractiveness = entity.gender === 'female'
+            ? other.traits.strength + other.meat * 2 + other.traits.speed
+            : 1; // Males go to nearest female
+          const score = attractiveness / d; // closer + better traits = higher score
+          if (score > bestScore) {
+            bestScore = score;
             bestPos = other.position;
           }
         }

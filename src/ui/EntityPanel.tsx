@@ -61,6 +61,21 @@ export function EntityPanel({ entity, onClose }: EntityPanelProps) {
         <Bar value={entity.traits.perception} max={5} color="#9ece6a" />
       </div>
       <div style={rowStyle}>
+        <span style={dimStyle}>Metabolism:</span>
+        <span>{entity.traits.metabolism}</span>
+        <Bar value={entity.traits.metabolism} max={2} color="#e0af68" />
+      </div>
+      <div style={rowStyle}>
+        <span style={dimStyle}>Aggression:</span>
+        <span>{entity.traits.aggression}</span>
+        <Bar value={entity.traits.aggression} max={10} color="#f7768e" />
+      </div>
+      <div style={rowStyle}>
+        <span style={dimStyle}>Fertility:</span>
+        <span>{entity.traits.fertility}</span>
+        <Bar value={entity.traits.fertility} max={2} color="#bb9af7" />
+      </div>
+      <div style={rowStyle}>
         <span style={dimStyle}>Position:</span>
         <span>{entity.position.x},{entity.position.y}</span>
       </div>

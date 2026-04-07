@@ -9,9 +9,12 @@ export interface Position {
 export type RGB = [number, number, number];
 
 export interface Traits {
-  strength: number;   // 1-10: fight chance, hunting speed
-  speed: number;      // 1-3: steps per tick
-  perception: number; // 1-5: food/mate sensing range
+  strength: number;      // 1-10: fight chance, hunting speed
+  speed: number;         // 1-3: steps per tick
+  perception: number;    // 1-5: food/mate sensing range
+  metabolism: number;    // 0.5-2.0: lower = less energy drain but slower
+  aggression: number;    // 0-10: 0 = always flee, 10 = always fight
+  fertility: number;     // 0.5-2.0: higher = shorter mating time but shorter maxAge
 }
 
 export interface Entity {

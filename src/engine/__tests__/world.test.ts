@@ -60,11 +60,11 @@ describe('createWorld', () => {
     }
   });
 
-  it('creates all entities with maxAge between 300 and 400 ticks (60-80 years)', () => {
+  it('creates all entities with maxAge between 40 and 120 years (adjusted by fertility)', () => {
     const world = createWorld({ gridSize: 30, entityCount: 20 });
     for (const entity of world.entities) {
-      expect(entity.maxAge).toBeGreaterThanOrEqual(60 * T);
-      expect(entity.maxAge).toBeLessThanOrEqual(80 * T);
+      expect(entity.maxAge).toBeGreaterThanOrEqual(40 * T);
+      expect(entity.maxAge).toBeLessThanOrEqual(120 * T);
     }
   });
 });
@@ -109,7 +109,7 @@ describe('aging and death', () => {
       tick: 0,
       animals: [], plants: [], log: [],
       entities: [
-        { id: 'e1', position: { x: 0, y: 0 }, gender: 'male', state: 'idle', stateTimer: 0, age: 0, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
+        { id: 'e1', position: { x: 0, y: 0 }, gender: 'male', state: 'idle', stateTimer: 0, age: 0, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
       ],
     };
     const next = tick(world);
@@ -123,7 +123,7 @@ describe('aging and death', () => {
       tick: 0,
       animals: [], plants: [], log: [],
       entities: [
-        { id: 'dying', position: { x: 0, y: 0 }, gender: 'male', state: 'idle', stateTimer: 0, age: 100 * T - 1, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
+        { id: 'dying', position: { x: 0, y: 0 }, gender: 'male', state: 'idle', stateTimer: 0, age: 100 * T - 1, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
       ],
     };
     const next = tick(world);
@@ -138,7 +138,7 @@ describe('aging and death', () => {
       tick: 0,
       animals: [], plants: [], log: [],
       entities: [
-        { id: 'e1', position: { x: 0, y: 0 }, gender: 'male', state: 'idle', stateTimer: 0, age: 0, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
+        { id: 'e1', position: { x: 0, y: 0 }, gender: 'male', state: 'idle', stateTimer: 0, age: 0, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
       ],
     };
     let current = world;
@@ -156,8 +156,8 @@ describe('aging and death', () => {
       tick: 0,
       animals: [], plants: [], log: [],
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
       ],
     };
     const next = tick(world);
@@ -176,8 +176,8 @@ describe('mating', () => {
       tick: 0,
       animals: [], plants: [], log: [],
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', stateTimer: 0, age: 10 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'idle', stateTimer: 0, age: 10 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', stateTimer: 0, age: 10 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'idle', stateTimer: 0, age: 10 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
       ],
     };
     const next = tick(world);
@@ -193,8 +193,8 @@ describe('mating', () => {
       tick: 0,
       animals: [], plants: [], log: [],
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', stateTimer: 0, age: 55 * T, maxAge: 80 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'idle', stateTimer: 0, age: 55 * T, maxAge: 80 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', stateTimer: 0, age: 55 * T, maxAge: 80 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'idle', stateTimer: 0, age: 55 * T, maxAge: 80 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
       ],
     };
     const next = tick(world);
@@ -210,8 +210,8 @@ describe('mating', () => {
       tick: 0,
       animals: [], plants: [], log: [],
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', stateTimer: 0, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 3 },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'idle', stateTimer: 0, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', stateTimer: 0, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 3 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'idle', stateTimer: 0, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
       ],
     };
     const next = tick(world);
@@ -228,8 +228,8 @@ describe('mating', () => {
       tick: 0,
       animals: [], plants: [], log: [],
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'female', state: 'idle', stateTimer: 0, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'idle', stateTimer: 0, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'female', state: 'idle', stateTimer: 0, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'idle', stateTimer: 0, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
       ],
     };
     const next = tick(world);
@@ -239,14 +239,14 @@ describe('mating', () => {
     expect(e2?.state).toBe('idle');
   });
 
-  it('two males on same tile enter fighting state', () => {
+  it('two aggressive males on same tile enter fighting state', () => {
     const world: WorldState = {
       gridSize: 30,
       tick: 0,
       animals: [], plants: [], log: [],
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', stateTimer: 0, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', stateTimer: 0, age: 25 * T, maxAge: 100 * T, color: [0, 0, 255] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', stateTimer: 0, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 10, fertility: 1.0 }, meat: 0 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', stateTimer: 0, age: 25 * T, maxAge: 100 * T, color: [0, 0, 255] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 10, fertility: 1.0 }, meat: 0 },
       ],
     };
     const next = tick(world);
@@ -260,8 +260,8 @@ describe('mating', () => {
       tick: 0,
       animals: [], plants: [], log: [],
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'fighting', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'male', state: 'fighting', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 0, 255] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'fighting', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'male', state: 'fighting', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 0, 255] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
       ],
     };
     const next = tick(world);
@@ -276,8 +276,8 @@ describe('mating', () => {
       tick: 0,
       animals: [], plants: [], log: [],
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
       ],
     };
     const next = tick(world);
@@ -302,8 +302,8 @@ describe('mating', () => {
       tick: 0,
       animals: [], plants: [], log: [],
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
       ],
     };
     const next = tick(world);
@@ -316,8 +316,8 @@ describe('mating', () => {
       tick: 0,
       animals: [], plants: [], log: [],
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
       ],
     };
     const next = tick(world);
@@ -334,8 +334,8 @@ describe('mating', () => {
         tick: 0,
         animals: [], plants: [], log: [],
         entities: [
-          { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
-          { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
+          { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
+          { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
         ],
       };
       const next = tick(world);
@@ -352,8 +352,8 @@ describe('mating', () => {
       tick: 0,
       animals: [], plants: [], log: [],
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
       ],
     };
     const next = tick(world);
@@ -373,8 +373,8 @@ describe('mating', () => {
       tick: 0,
       animals: [], plants: [], log: [],
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
       ],
     };
     const next = tick(world);
@@ -392,9 +392,9 @@ describe('mating', () => {
       tick: 0,
       animals: [], plants: [], log: [],
       entities: [
-        { id: 'blocker1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', stateTimer: 0, age: 0, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
-        { id: 'blocker2', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', stateTimer: 0, age: 0, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
-        { id: 'mover', position: { x: 4, y: 5 }, gender: 'female', state: 'idle', stateTimer: 0, age: 0, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2 }, meat: 0 },
+        { id: 'blocker1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', stateTimer: 0, age: 0, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
+        { id: 'blocker2', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', stateTimer: 0, age: 0, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
+        { id: 'mover', position: { x: 4, y: 5 }, gender: 'female', state: 'idle', stateTimer: 0, age: 0, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0 }, meat: 0 },
       ],
     };
     // Run tick multiple times and verify no tile ever has 3+ entities
