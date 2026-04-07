@@ -352,7 +352,7 @@ function detectInteractions(
   entities: Entity[],
   gridSize: number,
   skipIds: Set<string>,
-  villages: Village[],
+  _villages: Village[],
   allEntities: Entity[],
 ): Entity[] {
   const tileGroups = new Map<number, Entity[]>();
