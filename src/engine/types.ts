@@ -25,7 +25,10 @@ export interface Entity {
   color: RGB;
   energy: number;
   traits: Traits;
+  meat: number; // meat portions carried (males only, from hunting)
 }
+
+export const MEAT_PORTIONS_PER_HUNT = 5;
 
 // Traits
 export const TRAIT_ENERGY_COST = 0.15; // extra energy drain per total trait points above baseline

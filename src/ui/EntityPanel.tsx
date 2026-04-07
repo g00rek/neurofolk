@@ -35,6 +35,14 @@ export function EntityPanel({ entity, onClose }: EntityPanelProps) {
           {Math.round(entity.energy)}
         </span>
       </div>
+      {entity.gender === 'male' && (
+        <div style={rowStyle}>
+          <span style={dimStyle}>Meat:</span>
+          <span style={{ color: entity.meat > 0 ? '#ff9e64' : '#666' }}>
+            {entity.meat} portions
+          </span>
+        </div>
+      )}
       <div style={{ ...labelStyle, marginTop: '8px' }}>Traits</div>
       <div style={rowStyle}>
         <span style={dimStyle}>Strength:</span>

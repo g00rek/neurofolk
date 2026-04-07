@@ -5,7 +5,7 @@ import {
   ENERGY_MAX, ENERGY_START, ENERGY_DRAIN_INTERVAL, ENERGY_MEAT, ENERGY_PLANT,
   ENERGY_MATING_MIN, HUNGER_THRESHOLD, CHILD_AGE, TRAIT_ENERGY_COST,
   BASE_FOOD_SENSE_RANGE, ANIMAL_COUNT, PLANT_COUNT, ANIMAL_RESPAWN_INTERVAL, PLANT_RESPAWN_INTERVAL,
-  PLANT_GROW_TIME, FIGHT_MIN_AGE,
+  PLANT_GROW_TIME, FIGHT_MIN_AGE, MEAT_PORTIONS_PER_HUNT,
 } from './types';
 import { randomStep } from './movement';
 
@@ -150,6 +150,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
       color: BASE_COLORS[i % 3],
       energy: ENERGY_START,
       traits: randomTraits(),
+      meat: 0,
     });
   }
 
@@ -201,7 +202,7 @@ function detectInteractions(
       newActionIds.add(fightableMales[1].id);
     } else if (idleMales.length >= 1 && idleFemales.length >= 1) {
       const male = idleMales.find(e =>
-        isReproductive(e) && !newActionIds.has(e.id) && e.energy >= ENERGY_MATING_MIN
+        isReproductive(e) && !newActionIds.has(e.id) && e.energy >= ENERGY_MATING_MIN && e.meat > 0
       );
       const female = idleFemales.find(e =>
         isReproductive(e) && e.energy >= ENERGY_MATING_MIN
@@ -236,12 +237,17 @@ export function tick(state: WorldState): WorldState {
   let plants = [...state.plants];
   const log: LogEntry[] = [];
 
-  // --- Step 0: Age, energy drain, remove dead ---
+  // --- Step 0: Age, energy drain, eat meat if hungry, remove dead ---
   const aged: Entity[] = state.entities.map(e => {
     const a = { ...e, age: e.age + 1 };
     if (!isChild(a) && a.age % ENERGY_DRAIN_INTERVAL === 0) {
       const drain = 1 + traitEnergyDrain(a.traits);
       a.energy = Math.max(0, a.energy - drain);
+    }
+    // Males eat a meat portion when hungry
+    if (a.meat > 0 && isHungry(a)) {
+      a.meat -= 1;
+      a.energy = Math.min(ENERGY_MAX, a.energy + ENERGY_MEAT);
     }
     return a;
   });
@@ -305,6 +311,7 @@ export function tick(state: WorldState): WorldState {
           color: mixColors(male.color, female.color),
           energy: ENERGY_START,
           traits: inheritTraits(male.traits, female.traits),
+          meat: 0,
         });
         const baby = babies[babies.length - 1];
         log.push({ tick: tickNum, type: 'birth', entityId: baby.id, gender: baby.gender, age: 0 });
@@ -348,21 +355,21 @@ export function tick(state: WorldState): WorldState {
     }
   }
 
-  // Apply energy from consumed resources
+  // Apply results from resolved actions
   entities = entities
     .filter(e => !deadIds.has(e.id))
     .map(e => {
       if (resolvedIds.has(e.id)) {
         let energy = e.energy;
-        // Check if this entity just finished hunting/gathering
+        let meat = e.meat;
+
         if (e.state === 'hunting') {
-          // Check if there was a prey consumed at this position
           const hadPrey = animals.some(a =>
             a.position.x === e.position.x &&
             a.position.y === e.position.y &&
             consumedAnimalIds.has(a.id)
           );
-          if (hadPrey) energy = Math.min(ENERGY_MAX, energy + ENERGY_MEAT);
+          if (hadPrey) meat += MEAT_PORTIONS_PER_HUNT;
         } else if (e.state === 'gathering') {
           const hadPlant = plants.some(p =>
             p.position.x === e.position.x &&
@@ -370,8 +377,16 @@ export function tick(state: WorldState): WorldState {
             consumedPlantIds.has(p.id)
           );
           if (hadPlant) energy = Math.min(ENERGY_MAX, energy + ENERGY_PLANT);
+        } else if (e.state === 'mating') {
+          // Male gives 1 meat portion to female upon mating completion
+          if (e.gender === 'female') {
+            energy = Math.min(ENERGY_MAX, energy + ENERGY_MEAT);
+          } else if (e.gender === 'male') {
+            meat = Math.max(0, meat - 1);
+          }
         }
-        return { ...e, state: 'idle' as const, stateTimer: 0, energy };
+
+        return { ...e, state: 'idle' as const, stateTimer: 0, energy, meat };
       }
       if (e.state !== 'idle' && e.stateTimer > 1) {
         return { ...e, stateTimer: e.stateTimer - 1 };
@@ -383,6 +398,12 @@ export function tick(state: WorldState): WorldState {
   // Remove consumed resources
   animals = animals.filter(a => !consumedAnimalIds.has(a.id));
   plants = plants.filter(p => !consumedPlantIds.has(p.id));
+
+  // --- Step 1b: Move animals (before humans, so hunters can catch them) ---
+  animals = animals.map(a => ({
+    ...a,
+    position: randomStep(a.position, gridSize),
+  }));
 
   // --- Step 2: Detect interactions (pre-movement) ---
   entities = detectInteractions(entities, gridSize, resolvedIds);
@@ -474,6 +495,10 @@ export function tick(state: WorldState): WorldState {
         for (const other of entities) {
           if (other.gender !== oppositeGender || other.state !== 'idle' || !isReproductive(other)) continue;
           if (other.energy < ENERGY_MATING_MIN) continue;
+          // Females only attracted to males with meat
+          if (entity.gender === 'female' && other.meat <= 0) continue;
+          // Males need meat to mate
+          if (entity.gender === 'male' && entity.meat <= 0) continue;
           const d = manhattan(entity.position, other.position);
           if (d > 0 && d <= senseMate && d < bestDist) {
             bestDist = d;
@@ -530,13 +555,7 @@ export function tick(state: WorldState): WorldState {
     }
   }
 
-  // --- Step 5: Move animals randomly ---
-  animals = animals.map(a => ({
-    ...a,
-    position: randomStep(a.position, gridSize),
-  }));
-
-  // --- Step 6: Grow plants + respawn resources ---
+  // --- Step 5: Grow plants + respawn resources ---
   plants = plants.map(p => {
     if (p.mature) return p;
     const timer = p.growTimer - 1;
