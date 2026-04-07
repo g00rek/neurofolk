@@ -406,6 +406,15 @@ function detectInteractions(
         newActionIds.add(female.id);
       }
     }
+
+    // Same-tribe adult males on same tile → training (sparring)
+    if (!fightStarted) {
+      const sameTribeMales = fightableMales.filter(e => !newActionIds.has(e.id) && e.tribe >= 0);
+      if (sameTribeMales.length >= 2 && sameTribeMales[0].tribe === sameTribeMales[1].tribe) {
+        newActionIds.add(sameTribeMales[0].id);
+        newActionIds.add(sameTribeMales[1].id);
+      }
+    }
   }
 
   return entities.map(e => {
@@ -416,6 +425,10 @@ function detectInteractions(
       o => o.id !== e.id && o.gender === 'male' && newActionIds.has(o.id)
     );
     if (e.gender === 'male' && otherActionMale) {
+      // Same tribe → training, different tribe → fighting
+      if (e.tribe >= 0 && otherActionMale.tribe === e.tribe) {
+        return { ...e, state: 'training' as const, stateTimer: 3 };
+      }
       return { ...e, state: 'fighting' as const, stateTimer: FIGHTING_DURATION };
     }
     // Higher fertility = faster mating
@@ -552,6 +565,11 @@ export function tick(state: WorldState): WorldState {
           grid[birthPos.y][birthPos.x]++;
         }
       }
+    } else if (action === 'training') {
+      // Sparring complete → both get small stat boost
+      for (const trainee of finishing) {
+        resolvedIds.add(trainee.id);
+      }
     } else if (action === 'fighting') {
       // Strength-weighted fight: loser takes damage, dies only if energy drops to 0
       const [a, b] = finishing;
@@ -605,8 +623,21 @@ export function tick(state: WorldState): WorldState {
         let meat = e.meat;
         const myVillage = getVillage(e.tribe);
 
-        if (e.state === 'fighting') {
-          energy = Math.max(0, energy - 20); // fighting costs energy for everyone
+        if (e.state === 'training') {
+          // Sparring boosts random combat stat slightly
+          const boosted = { ...e.traits };
+          const roll = Math.random();
+          if (roll < 0.5) {
+            boosted.strength = Math.min(10, +(boosted.strength + 0.3).toFixed(1));
+          } else if (roll < 0.8) {
+            boosted.speed = Math.min(3, +(boosted.speed + 0.1).toFixed(1));
+          } else {
+            boosted.perception = Math.min(5, +(boosted.perception + 0.2).toFixed(1));
+          }
+          energy = Math.max(0, energy - 5); // light energy cost
+          return { ...e, state: 'idle' as const, stateTimer: 0, energy, meat, traits: boosted };
+        } else if (e.state === 'fighting') {
+          energy = Math.max(0, energy - 20);
           return { ...e, state: 'idle' as const, stateTimer: 0, energy, meat };
         } else if (e.state === 'hunting') {
           const hadPrey = animals.some(a =>

@@ -111,6 +111,7 @@ function stateLabel(entity: Entity): string {
     case 'mating': return '❤ Mating';
     case 'pregnant': return `🤰 Pregnant (${entity.stateTimer}t)`;
     case 'fighting': return '⚔ Fighting';
+    case 'training': return '⚔ Training';
     case 'hunting': return '🏹 Hunting';
     case 'gathering': return '🌿 Gathering';
     case 'idle': {

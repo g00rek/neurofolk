@@ -1,5 +1,5 @@
 export type Gender = 'male' | 'female';
-export type EntityState = 'idle' | 'mating' | 'pregnant' | 'fighting' | 'hunting' | 'gathering';
+export type EntityState = 'idle' | 'mating' | 'pregnant' | 'fighting' | 'hunting' | 'gathering' | 'training';
 
 export interface Position {
   x: number;
