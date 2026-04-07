@@ -30,7 +30,7 @@ export interface Village {
   plantStore: number;
 }
 
-export const PANTRY_MATING_MIN = 1; // min meat in pantry to allow mating
+// No food requirement for mating — they just need energy
 export const VILLAGE_OPTIMAL_POP = 12; // above this, mating energy cost rises
 
 export interface Entity {

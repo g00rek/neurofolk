@@ -6,7 +6,7 @@ import {
   ENERGY_MATING_MIN, HUNGER_THRESHOLD, CHILD_AGE, TRAIT_ENERGY_COST,
   BASE_FOOD_SENSE_RANGE, ANIMAL_COUNT, PLANT_COUNT, PLANT_RESPAWN_INTERVAL,
   PLANT_GROW_TIME, FIGHT_MIN_AGE, MEAT_PORTIONS_PER_HUNT,
-  ANIMAL_REPRO_INTERVAL, ANIMAL_MAX, ANIMAL_FLEE_RANGE, FOREST_SPEED_PENALTY, FOREST_PLANT_BONUS, VILLAGE_RADIUS, PANTRY_MATING_MIN, VILLAGE_OPTIMAL_POP,
+  ANIMAL_REPRO_INTERVAL, ANIMAL_MAX, ANIMAL_FLEE_RANGE, FOREST_SPEED_PENALTY, FOREST_PLANT_BONUS, VILLAGE_RADIUS, VILLAGE_OPTIMAL_POP,
 } from './types';
 import { generateBiomeGrid, isPassable, isPassableForRonin } from './biomes';
 // randomStep from movement.ts still used by randomStepBiome as fallback concept
@@ -393,9 +393,7 @@ function detectInteractions(
     if (!fightStarted && idleMales.length >= 1 && idleFemales.length >= 1) {
       const male = idleMales.find(e => {
         const minEnergy = matingEnergyCost(e.tribe, allEntities);
-        if (!isReproductive(e) || newActionIds.has(e.id) || e.energy < minEnergy) return false;
-        const v = e.tribe >= 0 ? villages.find(vl => vl.tribe === e.tribe) : undefined;
-        return v ? v.meatStore >= PANTRY_MATING_MIN : e.meat > 0;
+        return isReproductive(e) && !newActionIds.has(e.id) && e.energy >= minEnergy;
       });
       const female = idleFemales.find(e => {
         const minEnergy = matingEnergyCost(e.tribe, allEntities);
@@ -667,11 +665,6 @@ export function tick(state: WorldState): WorldState {
           }
         } else if (e.state === 'mating') {
           if (e.gender === 'male') {
-            if (myVillage) {
-              myVillage.meatStore = Math.max(0, myVillage.meatStore - 1);
-            } else {
-              meat = Math.max(0, meat - 1);
-            }
             return { ...e, state: 'idle' as const, stateTimer: 0, energy, meat };
           }
           const malePartner = entities.find(
@@ -679,7 +672,6 @@ export function tick(state: WorldState): WorldState {
               && o.position.x === e.position.x && o.position.y === e.position.y
           );
           const pregTime = Math.max(3, Math.round(PREGNANCY_DURATION / e.traits.fertility));
-          energy = Math.min(ENERGY_MAX, energy + ENERGY_MEAT); // fed by tribe/partner
           return {
             ...e,
             state: 'pregnant' as const,
@@ -775,7 +767,7 @@ export function tick(state: WorldState): WorldState {
       const shouldReturnHome = myVillage && !inOwnVillage && (
         isChild(entity) ||
         (entity.gender === 'female' && !isHungry(entity)) ||
-        (entity.gender === 'male' && !isHungry(entity) && isReproductive(entity) && entity.energy >= ENERGY_MATING_MIN && (getVillage(entity.tribe)?.meatStore ?? 0) >= PANTRY_MATING_MIN)
+        (entity.gender === 'male' && !isHungry(entity) && isReproductive(entity) && entity.energy >= ENERGY_MATING_MIN)
       );
       if (shouldReturnHome && myVillage) {
         target = stepToward(entity.position, myVillage.center, biomes, gridSize, entity.tribe, updatedVillages);
@@ -831,15 +823,6 @@ export function tick(state: WorldState): WorldState {
         for (const other of entities) {
           if (other.gender !== oppositeGender || other.state !== 'idle' || !isReproductive(other)) continue;
           if (other.energy < ENERGY_MATING_MIN) continue;
-          // Check food for mating: village pantry or personal meat
-          if (entity.gender === 'female') {
-            const ov = other.tribe >= 0 ? updatedVillages[other.tribe] : undefined;
-            if (!(ov ? ov.meatStore >= PANTRY_MATING_MIN : other.meat > 0)) continue;
-          }
-          if (entity.gender === 'male') {
-            const mv = entity.tribe >= 0 ? updatedVillages[entity.tribe] : undefined;
-            if (!(mv ? mv.meatStore >= PANTRY_MATING_MIN : entity.meat > 0)) continue;
-          }
           const d = manhattan(entity.position, other.position);
           if (d <= 0 || d > senseMateRange) continue;
           // Sexual selection: females prefer strong males with lots of meat
