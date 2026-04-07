@@ -533,6 +533,6 @@ export function tick(state: WorldState): WorldState {
     plants.push({ id: generateId('p'), position: randomPos(gridSize) });
   }
 
-  const fullLog = [...state.log, ...log].slice(-500);
+  const fullLog = [...state.log, ...log];
   return { entities, animals, plants, tick: tickNum, gridSize, log: fullLog };
 }
