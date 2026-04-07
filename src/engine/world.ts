@@ -1,5 +1,5 @@
 import type { Entity, Position, WorldState, RGB } from './types';
-import { MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE, TICKS_PER_YEAR, ACTION_DURATION } from './types';
+import { MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE, TICKS_PER_YEAR, ACTION_DURATION, PHEROMONE_RANGE } from './types';
 import { randomStep } from './movement';
 
 interface CreateWorldOptions {
@@ -206,7 +206,7 @@ export function tick(state: WorldState): WorldState {
     return { ...e, state: 'mating' as const, stateTimer: ACTION_DURATION };
   });
 
-  // --- Step 3: Move idle entities ---
+  // --- Step 3: Move idle entities (with pheromone attraction) ---
   const moveGrid = createOccupancyGrid(gridSize, entities);
   const indices = Array.from({ length: entities.length }, (_, i) => i);
   for (let i = indices.length - 1; i > 0; i--) {
@@ -220,7 +220,42 @@ export function tick(state: WorldState): WorldState {
     const entity = entities[idx];
     if (entity.state !== 'idle' || babyIds.has(entity.id)) continue;
 
-    const target = randomStep(entity.position, gridSize);
+    // Pheromone attraction: find nearest opposite-gender idle entity within range
+    let target: Position | null = null;
+
+    if (PHEROMONE_RANGE > 0) {
+      const oppositeGender = entity.gender === 'male' ? 'female' : 'male';
+      let bestDist = PHEROMONE_RANGE + 1;
+      let bestPos: Position | null = null;
+
+      for (const other of entities) {
+        if (other.gender !== oppositeGender || other.state !== 'idle') continue;
+        const dx = Math.abs(other.position.x - entity.position.x);
+        const dy = Math.abs(other.position.y - entity.position.y);
+        const dist = dx + dy; // Manhattan distance
+        if (dist > 0 && dist <= PHEROMONE_RANGE && dist < bestDist) {
+          bestDist = dist;
+          bestPos = other.position;
+        }
+      }
+
+      if (bestPos) {
+        // Step toward the attractive entity
+        const dx = bestPos.x - entity.position.x;
+        const dy = bestPos.y - entity.position.y;
+        if (Math.abs(dx) >= Math.abs(dy)) {
+          target = { x: entity.position.x + Math.sign(dx), y: entity.position.y };
+        } else {
+          target = { x: entity.position.x, y: entity.position.y + Math.sign(dy) };
+        }
+      }
+    }
+
+    // Fallback to random step
+    if (!target) {
+      target = randomStep(entity.position, gridSize);
+    }
+
     if (moveGrid[target.y][target.x] < 2) {
       moveGrid[entity.position.y][entity.position.x]--;
       moveGrid[target.y][target.x]++;
