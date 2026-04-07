@@ -1,5 +1,5 @@
 export type Gender = 'male' | 'female';
-export type EntityState = 'idle' | 'mating' | 'pregnant' | 'fighting' | 'hunting' | 'gathering' | 'training';
+export type EntityState = 'idle' | 'mating' | 'pregnant' | 'fighting' | 'hunting' | 'gathering' | 'training' | 'chopping' | 'building';
 
 export interface Position {
   x: number;
@@ -46,6 +46,8 @@ export interface Entity {
   traits: Traits;
   meat: number;
   tribe: TribeId;
+  homeId?: string; // house this entity lives in
+  carryingWood: boolean;
   partnerTraits?: Traits;
   partnerColor?: RGB;
   partnerTribe?: TribeId;
@@ -75,7 +77,18 @@ export interface Plant {
 }
 
 export const PLANT_GROW_TIME = 20; // ticks to mature
-export const FIGHT_MIN_AGE = 16; // years — children don't fight
+export const FOREST_REGROW_TIME = 30; // ticks for chopped forest to regrow
+export const FIGHT_MIN_AGE = 16;
+export const CHOPPING_DURATION = 3;
+export const BUILDING_DURATION = 5;
+
+export interface House {
+  id: string;
+  position: Position;
+  tribe: TribeId;
+  ownerId: string; // male who built it
+  partnerId?: string; // female living there
+}
 
 // Population
 export const MIN_REPRODUCTIVE_AGE = 18;
@@ -134,6 +147,7 @@ export interface WorldState {
   entities: Entity[];
   animals: Animal[];
   plants: Plant[];
+  houses: House[];
   biomes: Biome[][];
   villages: Village[];
   tick: number;

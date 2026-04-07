@@ -150,6 +150,28 @@ export function GridCanvas({ world, size, selectedId, onClick }: GridCanvasProps
       }
     }
 
+    // --- Draw houses ---
+    for (const house of world.houses) {
+      const hx = house.position.x * cellSize;
+      const hy = house.position.y * cellSize;
+      const vc = world.villages.find(v => v.tribe === house.tribe);
+      const [r, g, b] = vc?.color ?? [150, 150, 150];
+      // Small house shape
+      ctx.fillStyle = `rgba(${r},${g},${b},0.3)`;
+      ctx.fillRect(hx + cellSize * 0.1, hy + cellSize * 0.1, cellSize * 0.8, cellSize * 0.8);
+      ctx.strokeStyle = `rgb(${r},${g},${b})`;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(hx + cellSize * 0.1, hy + cellSize * 0.1, cellSize * 0.8, cellSize * 0.8);
+      // Roof triangle
+      ctx.beginPath();
+      ctx.moveTo(hx + cellSize * 0.05, hy + cellSize * 0.1);
+      ctx.lineTo(hx + cellSize * 0.5, hy - cellSize * 0.1);
+      ctx.lineTo(hx + cellSize * 0.95, hy + cellSize * 0.1);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(${r},${g},${b},0.5)`;
+      ctx.fill();
+    }
+
     // --- Draw plants (green = growing, red = ready) ---
     for (const plant of world.plants) {
       const cx = plant.position.x * cellSize + cellSize / 2;
@@ -249,6 +271,10 @@ export function GridCanvas({ world, size, selectedId, onClick }: GridCanvasProps
         tileIcons.push({ cx: baseCx, cy: baseCy, icon: '🏹' });
       } else if (hasGathering) {
         tileIcons.push({ cx: baseCx, cy: baseCy, icon: '🌿' });
+      } else if (group.some(e => e.state === 'chopping')) {
+        tileIcons.push({ cx: baseCx, cy: baseCy, icon: '🪓' });
+      } else if (group.some(e => e.state === 'building')) {
+        tileIcons.push({ cx: baseCx, cy: baseCy, icon: '🔨' });
       }
     }
 

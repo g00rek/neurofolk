@@ -1,4 +1,4 @@
-import type { Entity, Animal, Plant, Position, WorldState, RGB, Traits, LogEntry, Biome, Village, TribeId } from './types';
+import type { Entity, Animal, Plant, House, Position, WorldState, RGB, Traits, LogEntry, Biome, Village, TribeId } from './types';
 import {
   MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE, TICKS_PER_YEAR,
   BASE_PHEROMONE_RANGE, MATING_DURATION, PREGNANCY_DURATION, FIGHTING_DURATION, HUNTING_DURATION, GATHERING_DURATION,
@@ -6,6 +6,7 @@ import {
   ENERGY_MATING_MIN, HUNGER_THRESHOLD, CHILD_AGE, TRAIT_ENERGY_COST,
   BASE_FOOD_SENSE_RANGE, ANIMAL_COUNT, PLANT_COUNT, PLANT_RESPAWN_INTERVAL,
   PLANT_GROW_TIME, FIGHT_MIN_AGE, MEAT_PORTIONS_PER_HUNT,
+  CHOPPING_DURATION, BUILDING_DURATION,
   ANIMAL_REPRO_INTERVAL, ANIMAL_MAX, ANIMAL_FLEE_RANGE, FOREST_SPEED_PENALTY, FOREST_PLANT_BONUS, VILLAGE_RADIUS, VILLAGE_OPTIMAL_POP,
 } from './types';
 import { generateBiomeGrid, isPassable, isPassableForRonin } from './biomes';
@@ -308,6 +309,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
         traits,
         meat: 0,
         tribe,
+        carryingWood: false,
       });
     }
   }
@@ -343,7 +345,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
     });
   }
 
-  return { entities, animals, plants, biomes, villages, tick: 0, gridSize, log: [] };
+  return { entities, animals, plants, houses: [], biomes, villages, tick: 0, gridSize, log: [] };
 }
 
 // --- Interaction detection (mating/fighting) ---
@@ -393,7 +395,7 @@ function detectInteractions(
     if (!fightStarted && idleMales.length >= 1 && idleFemales.length >= 1) {
       const male = idleMales.find(e => {
         const minEnergy = matingEnergyCost(e.tribe, allEntities);
-        return isReproductive(e) && !newActionIds.has(e.id) && e.energy >= minEnergy;
+        return isReproductive(e) && !newActionIds.has(e.id) && e.energy >= minEnergy && !!e.homeId;
       });
       const female = idleFemales.find(e => {
         const minEnergy = matingEnergyCost(e.tribe, allEntities);
@@ -446,6 +448,7 @@ export function tick(state: WorldState): WorldState {
   }
   let animals = [...state.animals];
   let plants = [...state.plants];
+  let houses = [...state.houses];
   const log: LogEntry[] = [];
 
   // --- Step 0: Age, energy drain, eat meat if hungry, remove dead ---
@@ -555,8 +558,9 @@ export function tick(state: WorldState): WorldState {
             energy: ENERGY_START,
             traits: babyTraits,
             meat: 0,
-            // Same tribe parents → child in tribe. Mixed → ronin (-1)
+            carryingWood: false,
             tribe: (mother.partnerTribe === mother.tribe ? mother.tribe : -1) as TribeId,
+            homeId: mother.homeId, // baby lives in mother's house
           });
           const baby = babies[babies.length - 1];
           log.push({ tick: tickNum, type: 'birth', entityId: baby.id, gender: baby.gender, age: 0 });
@@ -583,6 +587,27 @@ export function tick(state: WorldState): WorldState {
         // Loser energy reduction handled in apply step below
         resolvedIds.add(winner.id);
         resolvedIds.add(loserId);
+      }
+    } else if (action === 'chopping') {
+      // Done chopping tree → now carrying wood
+      for (const chopper of finishing) {
+        resolvedIds.add(chopper.id);
+        // Forest tile becomes plains (stump), will regrow
+        if (biomes[chopper.position.y][chopper.position.x] === 'forest') {
+          biomes[chopper.position.y][chopper.position.x] = 'plains';
+        }
+      }
+    } else if (action === 'building') {
+      // Done building → create house
+      for (const builder of finishing) {
+        resolvedIds.add(builder.id);
+        const newHouse: House = {
+          id: generateId('h'),
+          position: { ...builder.position },
+          tribe: builder.tribe,
+          ownerId: builder.id,
+        };
+        houses.push(newHouse);
       }
     } else if (action === 'hunting') {
       for (const hunter of finishing) {
@@ -621,7 +646,12 @@ export function tick(state: WorldState): WorldState {
         let meat = e.meat;
         const myVillage = getVillage(e.tribe);
 
-        if (e.state === 'training') {
+        if (e.state === 'chopping') {
+          return { ...e, state: 'idle' as const, stateTimer: 0, energy: Math.max(0, energy - 10), meat, carryingWood: true };
+        } else if (e.state === 'building') {
+          const newHome = houses.find(h => h.ownerId === e.id && !e.homeId);
+          return { ...e, state: 'idle' as const, stateTimer: 0, energy: Math.max(0, energy - 10), meat, carryingWood: false, homeId: newHome?.id };
+        } else if (e.state === 'training') {
           // Sparring boosts random combat stat slightly
           const boosted = { ...e.traits };
           const roll = Math.random();
@@ -672,12 +702,19 @@ export function tick(state: WorldState): WorldState {
               && o.position.x === e.position.x && o.position.y === e.position.y
           );
           const pregTime = Math.max(3, Math.round(PREGNANCY_DURATION / e.traits.fertility));
+          // Female moves into male's house
+          const maleHome = malePartner?.homeId;
+          if (maleHome) {
+            const house = houses.find(h => h.id === maleHome);
+            if (house) house.partnerId = e.id;
+          }
           return {
             ...e,
             state: 'pregnant' as const,
             stateTimer: pregTime,
             energy,
             meat,
+            homeId: maleHome ?? e.homeId,
             partnerTraits: malePartner?.traits ?? e.traits,
             partnerColor: malePartner?.color ?? e.color,
             partnerTribe: malePartner?.tribe ?? e.tribe,
@@ -730,6 +767,22 @@ export function tick(state: WorldState): WorldState {
         entities[i] = { ...e, state: 'gathering', stateTimer: GATHERING_DURATION };
         continue;
       }
+    }
+
+    // Male without house, on forest tile → chop tree
+    if (e.gender === 'male' && !isChild(e) && !e.homeId && !e.carryingWood
+        && biomes[e.position.y][e.position.x] === 'forest') {
+      entities[i] = { ...e, state: 'chopping', stateTimer: CHOPPING_DURATION };
+      continue;
+    }
+
+    // Male carrying wood, in own village, on empty tile → build
+    const eVillage = e.tribe >= 0 ? updatedVillages.find(v => v.tribe === e.tribe) : undefined;
+    if (e.gender === 'male' && e.carryingWood && eVillage
+        && isInVillage(e.position, eVillage)
+        && !houses.some(h => h.position.x === e.position.x && h.position.y === e.position.y)) {
+      entities[i] = { ...e, state: 'building', stateTimer: BUILDING_DURATION };
+      continue;
     }
   }
 
@@ -841,9 +894,33 @@ export function tick(state: WorldState): WorldState {
         }
       }
 
-      // Priority 2b: Adult male in village, no mate found → go hunt ONLY if pantry low
+      // Priority 2b: Adult male without house → go to forest to chop wood
+      if (!target && entity.gender === 'male' && !isChild(entity) && !entity.homeId && !entity.carryingWood) {
+        // Find nearest forest tile
+        let bestDist = foodSenseRange(entity) * 2 + 1;
+        for (let dy = -bestDist; dy <= bestDist; dy++) {
+          for (let dx = -bestDist; dx <= bestDist; dx++) {
+            const nx = entity.position.x + dx;
+            const ny = entity.position.y + dy;
+            if (nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize && biomes[ny][nx] === 'forest') {
+              const d = Math.abs(dx) + Math.abs(dy);
+              if (d > 0 && d < bestDist) {
+                bestDist = d;
+                target = stepToward(entity.position, { x: nx, y: ny }, biomes, gridSize, entity.tribe, updatedVillages);
+              }
+            }
+          }
+        }
+      }
+
+      // Priority 2c: Carrying wood → return to village to build
+      if (!target && entity.gender === 'male' && entity.carryingWood && myVillage && !inOwnVillage) {
+        target = stepToward(entity.position, myVillage.center, biomes, gridSize, entity.tribe, updatedVillages);
+      }
+
+      // Priority 2d: Adult male in village, no mate found → go hunt ONLY if pantry low
       const pantryLow = myVillage && (myVillage.meatStore < 10 || myVillage.plantStore < 5);
-      if (!target && inOwnVillage && entity.gender === 'male' && !isChild(entity) && myVillage && pantryLow) {
+      if (!target && inOwnVillage && entity.gender === 'male' && !isChild(entity) && entity.homeId && myVillage && pantryLow) {
         const dx = entity.position.x - myVillage.center.x;
         const dy = entity.position.y - myVillage.center.y;
         const awayX = entity.position.x + Math.sign(dx || (Math.random() < 0.5 ? 1 : -1));
@@ -1042,5 +1119,5 @@ export function tick(state: WorldState): WorldState {
   }
 
   const fullLog = [...state.log, ...log];
-  return { entities, animals, plants, biomes, villages: updatedVillages, tick: tickNum, gridSize, log: fullLog };
+  return { entities, animals, plants, houses, biomes, villages: updatedVillages, tick: tickNum, gridSize, log: fullLog };
 }
