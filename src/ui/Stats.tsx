@@ -27,11 +27,9 @@ export function Stats({ world }: StatsProps) {
           {'  '}
           <span style={{ color: '#f7768e' }}>&#9792; {females}</span>
         </div>
-        {mating > 0 && (
-          <div style={{ fontSize: '11px', color: '#bb9af7', marginTop: '4px' }}>
-            &#10084; {mating / 2} par
-          </div>
-        )}
+        <div style={{ fontSize: '11px', color: '#bb9af7', marginTop: '4px', visibility: mating > 0 ? 'visible' : 'hidden' }}>
+          &#10084; {Math.floor(mating / 2)} par
+        </div>
       </div>
       <div style={panelStyle}>
         <div style={labelStyle}>Rok / Tura</div>
