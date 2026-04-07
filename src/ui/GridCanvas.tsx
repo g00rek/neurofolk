@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react';
 import type { WorldState, Entity } from '../engine/types';
+import { CHILD_AGE } from '../engine/types';
 import { ageInYears } from '../engine/world';
 
 const GRID_BG = '#1a1b26';
@@ -23,10 +24,12 @@ function drawPerson(
   cellSize: number,
   gender: string,
   color: string,
+  isChild: boolean,
 ) {
-  const s = cellSize * 0.38;
+  const scale = isChild ? 0.22 : 0.38;
+  const s = cellSize * scale;
   const headR = s * 0.3;
-  const headY = cy - s * 0.35;
+  const headY = cy - s * (isChild ? 0.15 : 0.35);
 
   ctx.beginPath();
   ctx.arc(cx, headY, headR, 0, Math.PI * 2);
@@ -34,7 +37,11 @@ function drawPerson(
   ctx.fill();
 
   ctx.beginPath();
-  if (gender === 'male') {
+  if (isChild) {
+    // Small round body for children
+    const br = s * 0.35;
+    ctx.arc(cx, headY + headR + br * 0.8, br, 0, Math.PI * 2);
+  } else if (gender === 'male') {
     const bw = s * 0.5;
     const bh = s * 0.55;
     const by = headY + headR + s * 0.04;
@@ -138,6 +145,7 @@ export function GridCanvas({ world, size, selectedId, onClick }: GridCanvasProps
       age: number; state: string;
       energy: number;
       id: string;
+      child: boolean;
     }
     const draws: DrawData[] = [];
     const tileIcons: Array<{ cx: number; cy: number; icon: string }> = [];
@@ -174,6 +182,7 @@ export function GridCanvas({ world, size, selectedId, onClick }: GridCanvasProps
           state: entity.state,
           energy: entity.energy,
           id: entity.id,
+          child: ageInYears(entity) < CHILD_AGE,
         });
       }
 
@@ -192,7 +201,7 @@ export function GridCanvas({ world, size, selectedId, onClick }: GridCanvasProps
 
     // Draw person figures
     for (const { cx, cy, color, gender } of draws) {
-      drawPerson(ctx, cx, cy, cellSize, gender, color);
+      drawPerson(ctx, cx, cy, cellSize, gender, color, child);
     }
 
     // Draw age below figure
