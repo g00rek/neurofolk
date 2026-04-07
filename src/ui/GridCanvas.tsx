@@ -1,14 +1,19 @@
 import { useRef, useEffect } from 'react';
-import type { WorldState } from '../engine/types';
+import type { WorldState, Entity } from '../engine/types';
 
-const MALE_ICON = '👨';
-const FEMALE_ICON = '👩';
+const MALE_COLOR = '#7aa2f7';
+const FEMALE_COLOR = '#f7768e';
 const GRID_BG = '#1a1b26';
 const GRID_LINE = '#2a2b36';
 
 interface GridCanvasProps {
   world: WorldState;
   size: number;
+}
+
+function entityColor(entity: Entity): string {
+  // TODO: will be driven by genes/RGB later
+  return entity.gender === 'male' ? MALE_COLOR : FEMALE_COLOR;
 }
 
 export function GridCanvas({ world, size }: GridCanvasProps) {
@@ -27,7 +32,7 @@ export function GridCanvas({ world, size }: GridCanvasProps) {
     ctx.fillStyle = GRID_BG;
     ctx.fillRect(0, 0, size, size);
 
-    // Grid lines — single path for all lines, skip if cells too small
+    // Grid lines
     if (cellSize >= 4) {
       ctx.beginPath();
       ctx.strokeStyle = GRID_LINE;
@@ -42,8 +47,8 @@ export function GridCanvas({ world, size }: GridCanvasProps) {
       ctx.stroke();
     }
 
-    // Group entities by tile (numeric key for speed)
-    const tileMap = new Map<number, typeof world.entities>();
+    // Group entities by tile
+    const tileMap = new Map<number, Entity[]>();
     for (const entity of world.entities) {
       const key = entity.position.y * world.gridSize + entity.position.x;
       const group = tileMap.get(key);
@@ -54,8 +59,8 @@ export function GridCanvas({ world, size }: GridCanvasProps) {
       }
     }
 
-    // Collect draw data per entity
-    const draws: Array<{ cx: number; cy: number; icon: string; age: number; mating: boolean }> = [];
+    // Collect draw data
+    const draws: Array<{ cx: number; cy: number; color: string; gender: string; age: number }> = [];
     const matingHearts: Array<{ cx: number; cy: number }> = [];
 
     for (const [, group] of tileMap) {
@@ -81,9 +86,9 @@ export function GridCanvas({ world, size }: GridCanvasProps) {
 
         draws.push({
           cx, cy,
-          icon: entity.gender === 'male' ? MALE_ICON : FEMALE_ICON,
+          color: entityColor(entity),
+          gender: entity.gender,
           age: entity.age,
-          mating: entity.state === 'mating',
         });
       }
 
@@ -95,23 +100,34 @@ export function GridCanvas({ world, size }: GridCanvasProps) {
       }
     }
 
-    // Draw person icons
-    const iconSize = Math.max(10, Math.floor(cellSize * 0.55));
-    ctx.font = `${iconSize}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    for (const { cx, cy, icon } of draws) {
-      ctx.fillText(icon, cx, cy - cellSize * 0.1);
+    const radius = cellSize * 0.38;
+
+    // Draw filled circles (RGB color — will come from genes later)
+    for (const { cx, cy, color } of draws) {
+      ctx.beginPath();
+      ctx.arc(cx, cy - cellSize * 0.05, radius, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
     }
 
-    // Draw age below icon
-    const ageSize = Math.max(6, Math.floor(cellSize * 0.28));
+    // Draw gender symbol (♂/♀) on circle
+    const symbolSize = Math.max(8, Math.floor(cellSize * 0.32));
+    ctx.font = `bold ${symbolSize}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    for (const { cx, cy, gender } of draws) {
+      ctx.fillText(gender === 'male' ? '♂' : '♀', cx, cy - cellSize * 0.05);
+    }
+
+    // Draw age below circle
+    const ageSize = Math.max(6, Math.floor(cellSize * 0.26));
     ctx.font = `bold ${ageSize}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#aaa';
     for (const { cx, cy, age } of draws) {
-      ctx.fillText(String(age), cx, cy + cellSize * 0.15);
+      ctx.fillText(String(age), cx, cy + radius - cellSize * 0.02);
     }
 
     // Draw hearts for mating pairs
@@ -122,7 +138,7 @@ export function GridCanvas({ world, size }: GridCanvasProps) {
       ctx.textBaseline = 'bottom';
       ctx.fillStyle = '#f7768e';
       for (const { cx, cy } of matingHearts) {
-        ctx.fillText('❤', cx, cy - cellSize * 0.4);
+        ctx.fillText('❤', cx, cy - cellSize * 0.42);
       }
     }
   }, [world, size]);
