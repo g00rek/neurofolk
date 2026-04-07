@@ -167,7 +167,31 @@ export function tick(state: WorldState): WorldState {
     newMatingIds.has(e.id) ? { ...e, state: 'mating' as const } : e
   );
 
-  // Rebuild grid after births (occupancy shifted from babies)
+  // --- Step 2b: Male fights ---
+  // Two idle males on the same tile → one dies (random loser)
+  const fightTiles = new Map<number, Entity[]>();
+  for (const e of entities) {
+    if (e.gender === 'male' && e.state === 'idle') {
+      const key = e.position.y * gridSize + e.position.x;
+      const group = fightTiles.get(key);
+      if (group) group.push(e);
+      else fightTiles.set(key, [e]);
+    }
+  }
+
+  const deadIds = new Set<string>();
+  for (const [, males] of fightTiles) {
+    if (males.length >= 2) {
+      const loser = males[Math.floor(Math.random() * males.length)];
+      deadIds.add(loser.id);
+    }
+  }
+
+  if (deadIds.size > 0) {
+    entities = entities.filter(e => !deadIds.has(e.id));
+  }
+
+  // Rebuild grid after births and fights
   const moveGrid = createOccupancyGrid(gridSize, entities);
 
   // --- Step 3: Move idle entities ---

@@ -212,12 +212,13 @@ describe('mating', () => {
   });
 
   it('same-gender entities on same tile do not enter mating state', () => {
+    // Use females — two males on same tile would trigger a fight
     const world: WorldState = {
       gridSize: 30,
       tick: 0,
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', age: 0, maxAge: 100 * 5, color: [255, 0, 0] as [number, number, number] },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', age: 0, maxAge: 100 * 5, color: [255, 0, 0] as [number, number, number] },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'female', state: 'idle', age: 25 * 5, maxAge: 100 * 5, color: [255, 0, 0] as [number, number, number] },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'idle', age: 25 * 5, maxAge: 100 * 5, color: [255, 0, 0] as [number, number, number] },
       ],
     };
     const next = tick(world);
@@ -225,6 +226,20 @@ describe('mating', () => {
     const e2 = next.entities.find(e => e.id === 'e2');
     expect(e1?.state).toBe('idle');
     expect(e2?.state).toBe('idle');
+  });
+
+  it('two males on same tile fight — one dies', () => {
+    const world: WorldState = {
+      gridSize: 30,
+      tick: 0,
+      entities: [
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', age: 25 * 5, maxAge: 100 * 5, color: [255, 0, 0] as [number, number, number] },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', age: 25 * 5, maxAge: 100 * 5, color: [0, 0, 255] as [number, number, number] },
+      ],
+    };
+    const next = tick(world);
+    expect(next.entities.length).toBe(1);
+    expect(next.entities[0].gender).toBe('male');
   });
 
   it('mating entities stay on the same tile (do not move)', () => {
