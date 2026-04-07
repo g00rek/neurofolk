@@ -64,9 +64,26 @@ export function Stats({ world }: StatsProps) {
         </div>
       </div>
       <div style={panelStyle}>
-        <div style={labelStyle}>Year / Tick</div>
-        <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{year}</div>
-        <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>tick {world.tick}</div>
+        <div style={labelStyle}>Time</div>
+        {(() => {
+          const ticksPerMonth = Math.floor(TICKS_PER_YEAR / 12);
+          const month = Math.floor((world.tick % TICKS_PER_YEAR) / Math.max(1, ticksPerMonth));
+          const seasonIdx = Math.floor(month / 3);
+          const seasons = ['🌸 Spring', '☀ Summer', '🍂 Autumn', '❄ Winter'];
+          const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          const day = (world.tick % Math.max(1, ticksPerMonth)) + 1;
+          return (
+            <>
+              <div style={{ fontSize: '20px', fontWeight: 'bold' }}>Year {year}</div>
+              <div style={{ fontSize: '13px', color: '#ccc', marginTop: '2px' }}>
+                {seasons[seasonIdx]} — {monthNames[month]}
+              </div>
+              <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
+                Day {day} · tick {world.tick}
+              </div>
+            </>
+          );
+        })()}
       </div>
       <div style={panelStyle}>
         <div style={labelStyle}>Age / Energy</div>
@@ -87,6 +104,10 @@ export function Stats({ world }: StatsProps) {
         <div style={{ fontSize: '11px' }}>
           <div>&#127993; {hunting} hunting</div>
           <div>&#127807; {gathering} gathering</div>
+          <div>&#129683; {world.entities.filter(e => e.state === 'chopping').length} chopping</div>
+          <div>&#128296; {world.entities.filter(e => e.state === 'building').length} building</div>
+          <div>&#128170; {world.entities.filter(e => e.state === 'training').length} training</div>
+          <div>&#127968; {world.houses.length} houses</div>
         </div>
       </div>
     </div>
