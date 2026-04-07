@@ -14,7 +14,7 @@ const POP_SAMPLE_INTERVAL = 5; // sample population every N ticks
 
 export function App() {
   const [world, setWorld] = useState<WorldState>(() =>
-    createWorld({ gridSize: 50, entityCount: 21 })
+    createWorld({ gridSize: 50, entityCount: 6 })
   );
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState(300);
@@ -109,7 +109,7 @@ export function App() {
   }, [world]);
 
   const handleReset = useCallback(() => {
-    setWorld(createWorld({ gridSize: 50, entityCount: 21 }));
+    setWorld(createWorld({ gridSize: 50, entityCount: 6 }));
     setRunning(false);
     setSelectedId(null);
     setHistory([]);

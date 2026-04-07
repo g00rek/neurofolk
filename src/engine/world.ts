@@ -267,7 +267,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
     radius: VILLAGE_RADIUS,
     color: tribeColors[i],
     name: tribeNames[i],
-    meatStore: 10, // start with some food
+    meatStore: 5, // modest start for Adam & Eve
     plantStore: 10,
   }));
 
@@ -301,7 +301,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
         gender: i < perTribe / 2 ? 'male' : 'female',
         state: 'idle',
         stateTimer: 0,
-        age: Math.floor(Math.random() * 31) * TICKS_PER_YEAR,
+        age: (MIN_REPRODUCTIVE_AGE + Math.floor(Math.random() * 10)) * TICKS_PER_YEAR, // 18-27 years
         maxAge: randomMaxAge(traits.fertility),
         color: traitsToColor(traits),
         energy: ENERGY_START,
