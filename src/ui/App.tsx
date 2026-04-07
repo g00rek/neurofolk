@@ -4,10 +4,13 @@ import { GridCanvas } from './GridCanvas';
 import { Stats } from './Stats';
 import { Controls } from './Controls';
 import { EntityPanel } from './EntityPanel';
+import { PopGraph } from './PopGraph';
+import { TraitAverages } from './TraitAverages';
 import type { WorldState } from '../engine/types';
 import { TICKS_PER_YEAR } from '../engine/types';
 
 const CANVAS_SIZE = 900;
+const POP_SAMPLE_INTERVAL = 5; // sample population every N ticks
 
 export function App() {
   const [world, setWorld] = useState<WorldState>(() =>
@@ -16,13 +19,21 @@ export function App() {
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState(300);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [popHistory, setPopHistory] = useState<number[]>([60]);
 
   const extinct = world.entities.length === 0 && world.tick > 0;
 
   const step = useCallback(() => {
     setWorld(prev => {
       if (prev.entities.length === 0) return prev;
-      return tick(prev);
+      const next = tick(prev);
+      if (next.tick % POP_SAMPLE_INTERVAL === 0) {
+        setPopHistory(h => {
+          const updated = [...h, next.entities.length];
+          return updated.length > 200 ? updated.slice(-200) : updated;
+        });
+      }
+      return next;
     });
   }, []);
 
@@ -79,7 +90,6 @@ export function App() {
   }, [world, selectedId]);
 
   const handleCanvasClick = useCallback((x: number, y: number) => {
-    // Find entity at grid position
     const entity = world.entities.find(
       e => e.position.x === x && e.position.y === y
     );
@@ -93,7 +103,7 @@ export function App() {
       </h1>
       {extinct && (
         <div style={{ background: '#f7768e22', border: '1px solid #f7768e', borderRadius: '4px', padding: '12px 20px', marginBottom: '16px', fontSize: '16px' }}>
-          Civilization extinct in year {Math.floor(world.tick / 10)} (tick {world.tick})
+          Civilization extinct in year {Math.floor(world.tick / TICKS_PER_YEAR)} (tick {world.tick})
         </div>
       )}
       <div style={layoutStyle}>
@@ -111,6 +121,11 @@ export function App() {
             />
           )}
           <Stats world={world} />
+          <div style={{ background: '#1a1b26', border: '1px solid #333', borderRadius: '4px', padding: '12px' }}>
+            <div style={labelStyle}>Population History</div>
+            <PopGraph history={popHistory} width={176} height={60} />
+          </div>
+          <TraitAverages entities={world.entities} />
           <Controls
             running={running}
             speed={speed}
@@ -142,4 +157,11 @@ const sidebarStyle: React.CSSProperties = {
   flexDirection: 'column',
   gap: '12px',
   width: '200px',
+};
+
+const labelStyle: React.CSSProperties = {
+  color: '#888',
+  fontSize: '11px',
+  textTransform: 'uppercase',
+  marginBottom: '8px',
 };
