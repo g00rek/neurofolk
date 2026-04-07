@@ -99,6 +99,7 @@ function Bar({ value, max, color }: { value: number; max: number; color: string 
 function stateLabel(entity: Entity): string {
   switch (entity.state) {
     case 'mating': return '❤ Mating';
+    case 'pregnant': return `🤰 Pregnant (${entity.stateTimer}t)`;
     case 'fighting': return '⚔ Fighting';
     case 'hunting': return '🏹 Hunting';
     case 'gathering': return '🌿 Gathering';

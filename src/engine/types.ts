@@ -1,5 +1,5 @@
 export type Gender = 'male' | 'female';
-export type EntityState = 'idle' | 'mating' | 'fighting' | 'hunting' | 'gathering';
+export type EntityState = 'idle' | 'mating' | 'pregnant' | 'fighting' | 'hunting' | 'gathering';
 
 export interface Position {
   x: number;
@@ -30,6 +30,8 @@ export interface Entity {
   energy: number;
   traits: Traits;
   meat: number; // meat portions carried (males only, from hunting)
+  partnerTraits?: Traits; // stored father's traits during pregnancy
+  partnerColor?: RGB;
 }
 
 export const MEAT_PORTIONS_PER_HUNT = 8;
@@ -65,7 +67,8 @@ export const TICKS_PER_YEAR = 10;
 export const BASE_PHEROMONE_RANGE = 1; // added to perception for mate sensing
 
 // Actions
-export const MATING_DURATION = 3;
+export const MATING_DURATION = 1;
+export const PREGNANCY_DURATION = 10; // ~1 year
 export const FIGHTING_DURATION = 3;
 export const HUNTING_DURATION = 3;
 export const GATHERING_DURATION = 2;

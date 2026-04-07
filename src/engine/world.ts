@@ -1,7 +1,7 @@
 import type { Entity, Animal, Plant, Position, WorldState, RGB, Traits, LogEntry, Biome } from './types';
 import {
   MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE, TICKS_PER_YEAR,
-  BASE_PHEROMONE_RANGE, MATING_DURATION, FIGHTING_DURATION, HUNTING_DURATION, GATHERING_DURATION,
+  BASE_PHEROMONE_RANGE, MATING_DURATION, PREGNANCY_DURATION, FIGHTING_DURATION, HUNTING_DURATION, GATHERING_DURATION,
   ENERGY_MAX, ENERGY_START, ENERGY_DRAIN_INTERVAL, ENERGY_MEAT, ENERGY_PLANT,
   ENERGY_MATING_MIN, HUNGER_THRESHOLD, CHILD_AGE, TRAIT_ENERGY_COST,
   BASE_FOOD_SENSE_RANGE, ANIMAL_COUNT, PLANT_COUNT, PLANT_RESPAWN_INTERVAL,
@@ -374,29 +374,35 @@ export function tick(state: WorldState): WorldState {
       const male = finishing.find(e => e.gender === 'male');
       const female = finishing.find(e => e.gender === 'female');
       if (male && female) {
+        // Male goes free, female becomes pregnant
         resolvedIds.add(male.id);
         resolvedIds.add(female.id);
+        // Female stores partner info for birth (handled in pregnantIds below)
+      }
+    } else if (action === 'pregnant') {
+      // Pregnancy complete → give birth
+      for (const mother of finishing) {
+        resolvedIds.add(mother.id);
 
-        // Determine number of babies: twinChance from mother
-        const tc = female.traits.twinChance;
+        const fatherTraits = mother.partnerTraits ?? mother.traits;
+        const tc = mother.traits.twinChance;
         let babyCount = 1;
         if (Math.random() < tc) {
-          // Multiple birth: weighted — twins most common, triplets rare, quads very rare
           const roll = Math.random();
-          if (roll < 0.7) babyCount = 2;       // twins
-          else if (roll < 0.92) babyCount = 3;  // triplets
-          else babyCount = 4;                    // quads
+          if (roll < 0.7) babyCount = 2;
+          else if (roll < 0.92) babyCount = 3;
+          else babyCount = 4;
         }
 
-        const ns = neighbors(male.position, gridSize);
+        const ns = neighbors(mother.position, gridSize);
 
         for (let b = 0; b < babyCount; b++) {
           const free = ns.filter(n => grid[n.y][n.x] < 2);
           const birthPos = free.length > 0
             ? free[Math.floor(Math.random() * free.length)]
-            : { ...male.position };
+            : { ...mother.position };
 
-          const babyTraits = inheritTraits(male.traits, female.traits);
+          const babyTraits = inheritTraits(fatherTraits, mother.traits);
           babies.push({
             id: generateId('e'),
             position: birthPos,
@@ -476,12 +482,29 @@ export function tick(state: WorldState): WorldState {
           );
           if (hadPlant) energy = Math.min(ENERGY_MAX, energy + ENERGY_PLANT);
         } else if (e.state === 'mating') {
-          // Male gives 1 meat portion to female upon mating completion
-          if (e.gender === 'female') {
-            energy = Math.min(ENERGY_MAX, energy + ENERGY_MEAT);
-          } else if (e.gender === 'male') {
+          if (e.gender === 'male') {
             meat = Math.max(0, meat - 1);
+            return { ...e, state: 'idle' as const, stateTimer: 0, energy, meat };
           }
+          // Female → pregnant. Find the male partner on same tile.
+          const malePartner = entities.find(
+            o => o.id !== e.id && o.gender === 'male' && o.state === 'mating'
+              && o.position.x === e.position.x && o.position.y === e.position.y
+          );
+          const pregTime = Math.max(3, Math.round(PREGNANCY_DURATION / e.traits.fertility));
+          energy = Math.min(ENERGY_MAX, energy + ENERGY_MEAT); // meat gift
+          return {
+            ...e,
+            state: 'pregnant' as const,
+            stateTimer: pregTime,
+            energy,
+            meat,
+            partnerTraits: malePartner?.traits ?? e.traits,
+            partnerColor: malePartner?.color ?? e.color,
+          };
+        } else if (e.state === 'pregnant') {
+          // Birth handled above, just go idle and clear partner data
+          return { ...e, state: 'idle' as const, stateTimer: 0, energy, meat, partnerTraits: undefined, partnerColor: undefined };
         }
 
         return { ...e, state: 'idle' as const, stateTimer: 0, energy, meat };

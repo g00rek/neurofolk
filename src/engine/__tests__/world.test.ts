@@ -161,12 +161,11 @@ describe('aging and death', () => {
       tick: 0,
       animals: [], plants: [], log: [], biomes: plainsBiomes(30),
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0 },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'pregnant', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0, partnerTraits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 } },
       ],
     };
     const next = tick(world);
-    const baby = next.entities.find(e => e.id !== 'e1' && e.id !== 'e2');
+    const baby = next.entities.find(e => e.id !== 'e2');
     expect(baby).toBeDefined();
     expect(baby?.age).toBe(0);
     expect(baby?.maxAge).toBeGreaterThanOrEqual(40 * T);
@@ -275,30 +274,22 @@ describe('mating', () => {
     expect(next.entities[0].state).toBe('idle');
   });
 
-  it('mating entities stay on the same tile (do not move)', () => {
+  it('mating resolves: male goes idle, female becomes pregnant', () => {
     const world: WorldState = {
       gridSize: 30,
       tick: 0,
       animals: [], plants: [], log: [], biomes: plainsBiomes(30),
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0 },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 10, fertility: 1.0, twinChance: 0 }, meat: 3 },
         { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0 },
       ],
     };
     const next = tick(world);
-    // After mating tick, parents become idle and a baby is born — positions may change next tick
-    // but during this tick the parents should not have moved before birth resolves
     const e1 = next.entities.find(e => e.id === 'e1');
     const e2 = next.entities.find(e => e.id === 'e2');
-    // Parents become idle after mating completes (birth step)
     expect(e1?.state).toBe('idle');
-    expect(e2?.state).toBe('idle');
-    // Parents did not move during mating resolution (they may move in step 4 as idle)
-    // The key constraint is that they were NOT moving while in mating state
-    // After birth they are idle and can move — their final position may differ from 5,5
-    // but they started at 5,5 and the mating resolution didn't teleport them
-    expect(e1?.position.x).toBeGreaterThanOrEqual(0);
-    expect(e2?.position.x).toBeGreaterThanOrEqual(0);
+    expect(e2?.state).toBe('pregnant');
+    expect(e2?.stateTimer).toBeGreaterThan(0);
   });
 
   it('birth occurs after mating turn — entity count increases by 1', () => {
@@ -307,12 +298,11 @@ describe('mating', () => {
       tick: 0,
       animals: [], plants: [], log: [], biomes: plainsBiomes(30),
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0 },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'pregnant', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0, partnerTraits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 } },
       ],
     };
     const next = tick(world);
-    expect(next.entities.length).toBe(3);
+    expect(next.entities.length).toBe(2); // mother + 1 baby
   });
 
   it('newborn has a valid gender', () => {
@@ -321,12 +311,11 @@ describe('mating', () => {
       tick: 0,
       animals: [], plants: [], log: [], biomes: plainsBiomes(30),
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0 },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'pregnant', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0, partnerTraits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 } },
       ],
     };
     const next = tick(world);
-    const baby = next.entities.find(e => e.id !== 'e1' && e.id !== 'e2');
+    const baby = next.entities.find(e => e.id !== 'e2');
     expect(baby).toBeDefined();
     expect(['male', 'female']).toContain(baby?.gender);
   });
@@ -339,12 +328,11 @@ describe('mating', () => {
         tick: 0,
         animals: [], plants: [], log: [], biomes: plainsBiomes(30),
         entities: [
-          { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0 },
-          { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0 },
+          { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'pregnant', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0, partnerTraits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 } },
         ],
       };
       const next = tick(world);
-      const baby = next.entities.find(e => e.id !== 'e1' && e.id !== 'e2');
+      const baby = next.entities.find(e => e.id !== 'e2');
       if (baby) gendersObserved.add(baby.gender);
     }
     expect(gendersObserved.has('male')).toBe(true);
@@ -357,12 +345,11 @@ describe('mating', () => {
       tick: 0,
       animals: [], plants: [], log: [], biomes: plainsBiomes(30),
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0 },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'pregnant', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0, partnerTraits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 } },
       ],
     };
     const next = tick(world);
-    const baby = next.entities.find(e => e.id !== 'e1' && e.id !== 'e2');
+    const baby = next.entities.find(e => e.id !== 'e2');
     expect(baby).toBeDefined();
     if (baby) {
       const dx = Math.abs(baby.position.x - 5);
@@ -378,12 +365,11 @@ describe('mating', () => {
       tick: 0,
       animals: [], plants: [], log: [], biomes: plainsBiomes(30),
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [255, 0, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0 },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'pregnant', stateTimer: 1, age: 25 * T, maxAge: 100 * T, color: [0, 255, 0] as [number, number, number], energy: 80, traits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 }, meat: 0, partnerTraits: { strength: 5, speed: 1, perception: 2, metabolism: 1.0, aggression: 5, fertility: 1.0, twinChance: 0 } },
       ],
     };
     const next = tick(world);
-    const baby = next.entities.find(e => e.id !== 'e1' && e.id !== 'e2');
+    const baby = next.entities.find(e => e.id !== 'e2');
     expect(baby?.state).toBe('idle');
   });
 
