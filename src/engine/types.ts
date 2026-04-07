@@ -30,7 +30,7 @@ export interface Village {
   plantStore: number;
 }
 
-export const PANTRY_MATING_MIN = 3; // min meat in pantry to allow mating
+export const PANTRY_MATING_MIN = 1; // min meat in pantry to allow mating
 export const VILLAGE_OPTIMAL_POP = 12; // above this, mating energy cost rises
 
 export interface Entity {
@@ -96,7 +96,7 @@ export const ENERGY_START = 80;
 export const ENERGY_DRAIN_INTERVAL = 3; // lose 1 energy every N ticks
 export const ENERGY_MEAT = 50;
 export const ENERGY_PLANT = 35;
-export const ENERGY_MATING_MIN = 50;
+export const ENERGY_MATING_MIN = 30;
 export const HUNGER_THRESHOLD = 40; // eat from pantry when truly hungry
 export const CHILD_AGE = 10; // children don't lose energy (years)
 
