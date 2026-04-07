@@ -4,6 +4,7 @@ import { GridCanvas } from './GridCanvas';
 import { Stats } from './Stats';
 import { Controls } from './Controls';
 import { EntityPanel } from './EntityPanel';
+import { EventLog } from './EventLog';
 import type { WorldState } from '../engine/types';
 
 const CANVAS_SIZE = 900;
@@ -81,6 +82,7 @@ export function App() {
             onToggle={() => setRunning(r => !r)}
             onSpeedChange={setSpeed}
           />
+          <EventLog log={world.log} />
         </div>
       </div>
     </div>

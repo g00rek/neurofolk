@@ -1,4 +1,4 @@
-import type { Entity, Animal, Plant, Position, WorldState, RGB, Traits } from './types';
+import type { Entity, Animal, Plant, Position, WorldState, RGB, Traits, LogEntry } from './types';
 import {
   MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE, TICKS_PER_YEAR,
   BASE_PHEROMONE_RANGE, MATING_DURATION, FIGHTING_DURATION, HUNTING_DURATION, GATHERING_DURATION,
@@ -162,7 +162,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
     plants.push({ id: generateId('p'), position: randomPos(gridSize) });
   }
 
-  return { entities, animals, plants, tick: 0, gridSize };
+  return { entities, animals, plants, tick: 0, gridSize, log: [] };
 }
 
 // --- Interaction detection (mating/fighting) ---
@@ -221,21 +221,31 @@ function detectInteractions(
 
 export function tick(state: WorldState): WorldState {
   const { gridSize } = state;
+  const tickNum = state.tick + 1;
   let animals = [...state.animals];
   let plants = [...state.plants];
+  const log: LogEntry[] = [];
 
   // --- Step 0: Age, energy drain, remove dead ---
-  let entities: Entity[] = state.entities
-    .map(e => {
-      const aged = { ...e, age: e.age + 1 };
-      // Energy drain (skip children). Higher traits = more drain.
-      if (!isChild(aged) && aged.age % ENERGY_DRAIN_INTERVAL === 0) {
-        const drain = 1 + traitEnergyDrain(aged.traits);
-        aged.energy = Math.max(0, aged.energy - drain);
-      }
-      return aged;
-    })
-    .filter(e => e.age < e.maxAge && e.energy > 0);
+  const aged: Entity[] = state.entities.map(e => {
+    const a = { ...e, age: e.age + 1 };
+    if (!isChild(a) && a.age % ENERGY_DRAIN_INTERVAL === 0) {
+      const drain = 1 + traitEnergyDrain(a.traits);
+      a.energy = Math.max(0, a.energy - drain);
+    }
+    return a;
+  });
+
+  let entities: Entity[] = [];
+  for (const e of aged) {
+    if (e.age >= e.maxAge) {
+      log.push({ tick: tickNum, type: 'death', entityId: e.id, gender: e.gender, age: e.age, cause: 'old_age' });
+    } else if (e.energy <= 0) {
+      log.push({ tick: tickNum, type: 'death', entityId: e.id, gender: e.gender, age: e.age, cause: 'starvation' });
+    } else {
+      entities.push(e);
+    }
+  }
 
   // --- Step 1: Resolve completed actions ---
   const grid = createOccupancyGrid(gridSize, entities);
@@ -286,6 +296,8 @@ export function tick(state: WorldState): WorldState {
           energy: ENERGY_START,
           traits: inheritTraits(male.traits, female.traits),
         });
+        const baby = babies[babies.length - 1];
+        log.push({ tick: tickNum, type: 'birth', entityId: baby.id, gender: baby.gender, age: 0 });
         grid[birthPos.y][birthPos.x]++;
       }
     } else if (action === 'fighting') {
@@ -295,6 +307,7 @@ export function tick(state: WorldState): WorldState {
         const winner = fightWinner(a, b);
         const loser = winner.id === a.id ? b : a;
         deadIds.add(loser.id);
+        log.push({ tick: tickNum, type: 'death', entityId: loser.id, gender: loser.gender, age: loser.age, cause: 'fight' });
         resolvedIds.add(winner.id);
       }
     } else if (action === 'hunting') {
@@ -513,7 +526,6 @@ export function tick(state: WorldState): WorldState {
   }));
 
   // --- Step 6: Respawn resources ---
-  const tickNum = state.tick + 1;
   if (tickNum % ANIMAL_RESPAWN_INTERVAL === 0) {
     animals.push({ id: generateId('a'), position: randomPos(gridSize) });
   }
@@ -521,5 +533,6 @@ export function tick(state: WorldState): WorldState {
     plants.push({ id: generateId('p'), position: randomPos(gridSize) });
   }
 
-  return { entities, animals, plants, tick: tickNum, gridSize };
+  const fullLog = [...state.log, ...log].slice(-500);
+  return { entities, animals, plants, tick: tickNum, gridSize, log: fullLog };
 }

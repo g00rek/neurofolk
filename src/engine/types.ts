@@ -69,10 +69,22 @@ export const PLANT_COUNT = 40;
 export const ANIMAL_RESPAWN_INTERVAL = 10;
 export const PLANT_RESPAWN_INTERVAL = 5; // 1 new plant every N ticks
 
+export type DeathCause = 'old_age' | 'starvation' | 'fight';
+
+export interface LogEntry {
+  tick: number;
+  type: 'birth' | 'death';
+  entityId: string;
+  gender: Gender;
+  age: number; // in ticks
+  cause?: DeathCause;
+}
+
 export interface WorldState {
   entities: Entity[];
   animals: Animal[];
   plants: Plant[];
   tick: number;
   gridSize: number;
+  log: LogEntry[];
 }
