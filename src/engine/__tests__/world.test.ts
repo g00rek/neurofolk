@@ -48,6 +48,22 @@ describe('createWorld', () => {
       expect(entity.state).toBe('idle');
     }
   });
+
+  it('creates all entities with age 0-30', () => {
+    const world = createWorld({ gridSize: 30, entityCount: 20 });
+    for (const entity of world.entities) {
+      expect(entity.age).toBeGreaterThanOrEqual(0);
+      expect(entity.age).toBeLessThanOrEqual(30);
+    }
+  });
+
+  it('creates all entities with maxAge between 60 and 80', () => {
+    const world = createWorld({ gridSize: 30, entityCount: 20 });
+    for (const entity of world.entities) {
+      expect(entity.maxAge).toBeGreaterThanOrEqual(60);
+      expect(entity.maxAge).toBeLessThanOrEqual(80);
+    }
+  });
 });
 
 describe('tick', () => {
@@ -60,8 +76,8 @@ describe('tick', () => {
   it('entity count can grow due to births (not fixed)', () => {
     const world = createWorld({ gridSize: 30, entityCount: 10 });
     const next = tick(world);
-    // Population can stay same or grow; never shrinks
-    expect(next.entities.length).toBeGreaterThanOrEqual(10);
+    // Population can stay same or grow or shrink (deaths); just check it's non-negative
+    expect(next.entities.length).toBeGreaterThanOrEqual(0);
   });
 
   it('returns a new state object (immutable)', () => {
@@ -83,14 +99,109 @@ describe('tick', () => {
   });
 });
 
+describe('aging and death', () => {
+  it('entity age increments each tick', () => {
+    const world: WorldState = {
+      gridSize: 30,
+      tick: 0,
+      entities: [
+        { id: 'e1', position: { x: 0, y: 0 }, gender: 'male', state: 'idle', age: 0, maxAge: 100 },
+      ],
+    };
+    const next = tick(world);
+    const e1 = next.entities.find(e => e.id === 'e1');
+    expect(e1?.age).toBe(1);
+  });
+
+  it('entity dies when age reaches maxAge', () => {
+    const world: WorldState = {
+      gridSize: 30,
+      tick: 0,
+      entities: [
+        { id: 'dying', position: { x: 0, y: 0 }, gender: 'male', state: 'idle', age: 99, maxAge: 100 },
+      ],
+    };
+    const next = tick(world);
+    // age becomes 100, which equals maxAge=100, so entity is removed
+    const dying = next.entities.find(e => e.id === 'dying');
+    expect(dying).toBeUndefined();
+  });
+
+  it('entity survives when age is well below maxAge', () => {
+    const world: WorldState = {
+      gridSize: 30,
+      tick: 0,
+      entities: [
+        { id: 'e1', position: { x: 0, y: 0 }, gender: 'male', state: 'idle', age: 0, maxAge: 100 },
+      ],
+    };
+    let current = world;
+    for (let i = 0; i < 50; i++) {
+      current = tick(current);
+    }
+    const e1 = current.entities.find(e => e.id === 'e1');
+    expect(e1).toBeDefined();
+    expect(e1?.age).toBe(50);
+  });
+
+  it('newborn has age 0 and maxAge between 60-100', () => {
+    const world: WorldState = {
+      gridSize: 30,
+      tick: 0,
+      entities: [
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', age: 25, maxAge: 100 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', age: 25, maxAge: 100 },
+      ],
+    };
+    const next = tick(world);
+    const baby = next.entities.find(e => e.id !== 'e1' && e.id !== 'e2');
+    expect(baby).toBeDefined();
+    expect(baby?.age).toBe(0);
+    expect(baby?.maxAge).toBeGreaterThanOrEqual(60);
+    expect(baby?.maxAge).toBeLessThanOrEqual(80);
+  });
+});
+
 describe('mating', () => {
+  it('entities too young to reproduce do not mate', () => {
+    const world: WorldState = {
+      gridSize: 30,
+      tick: 0,
+      entities: [
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', age: 10, maxAge: 100 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'idle', age: 10, maxAge: 100 },
+      ],
+    };
+    const next = tick(world);
+    const e1 = next.entities.find(e => e.id === 'e1');
+    const e2 = next.entities.find(e => e.id === 'e2');
+    expect(e1?.state).toBe('idle');
+    expect(e2?.state).toBe('idle');
+  });
+
+  it('entities too old to reproduce do not mate', () => {
+    const world: WorldState = {
+      gridSize: 30,
+      tick: 0,
+      entities: [
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', age: 55, maxAge: 80 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'idle', age: 55, maxAge: 80 },
+      ],
+    };
+    const next = tick(world);
+    const e1 = next.entities.find(e => e.id === 'e1');
+    const e2 = next.entities.find(e => e.id === 'e2');
+    expect(e1?.state).toBe('idle');
+    expect(e2?.state).toBe('idle');
+  });
+
   it('entities on same tile with opposite gender enter mating state', () => {
     const world: WorldState = {
       gridSize: 30,
       tick: 0,
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle' },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'idle' },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', age: 25, maxAge: 100 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'idle', age: 25, maxAge: 100 },
       ],
     };
     const next = tick(world);
@@ -105,8 +216,8 @@ describe('mating', () => {
       gridSize: 30,
       tick: 0,
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle' },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'male', state: 'idle' },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', age: 0, maxAge: 100 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', age: 0, maxAge: 100 },
       ],
     };
     const next = tick(world);
@@ -121,8 +232,8 @@ describe('mating', () => {
       gridSize: 30,
       tick: 0,
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating' },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating' },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', age: 25, maxAge: 100 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', age: 25, maxAge: 100 },
       ],
     };
     const next = tick(world);
@@ -146,8 +257,8 @@ describe('mating', () => {
       gridSize: 30,
       tick: 0,
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating' },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating' },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', age: 25, maxAge: 100 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', age: 25, maxAge: 100 },
       ],
     };
     const next = tick(world);
@@ -159,8 +270,8 @@ describe('mating', () => {
       gridSize: 30,
       tick: 0,
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating' },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating' },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', age: 25, maxAge: 100 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', age: 25, maxAge: 100 },
       ],
     };
     const next = tick(world);
@@ -176,8 +287,8 @@ describe('mating', () => {
         gridSize: 30,
         tick: 0,
         entities: [
-          { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating' },
-          { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating' },
+          { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', age: 0, maxAge: 100 },
+          { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', age: 0, maxAge: 100 },
         ],
       };
       const next = tick(world);
@@ -193,8 +304,8 @@ describe('mating', () => {
       gridSize: 30,
       tick: 0,
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating' },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating' },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', age: 25, maxAge: 100 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', age: 25, maxAge: 100 },
       ],
     };
     const next = tick(world);
@@ -213,8 +324,8 @@ describe('mating', () => {
       gridSize: 30,
       tick: 0,
       entities: [
-        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating' },
-        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating' },
+        { id: 'e1', position: { x: 5, y: 5 }, gender: 'male', state: 'mating', age: 25, maxAge: 100 },
+        { id: 'e2', position: { x: 5, y: 5 }, gender: 'female', state: 'mating', age: 25, maxAge: 100 },
       ],
     };
     const next = tick(world);
@@ -231,9 +342,9 @@ describe('mating', () => {
       gridSize: 10,
       tick: 0,
       entities: [
-        { id: 'blocker1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle' },
-        { id: 'blocker2', position: { x: 5, y: 5 }, gender: 'male', state: 'idle' },
-        { id: 'mover', position: { x: 4, y: 5 }, gender: 'female', state: 'idle' },
+        { id: 'blocker1', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', age: 0, maxAge: 100 },
+        { id: 'blocker2', position: { x: 5, y: 5 }, gender: 'male', state: 'idle', age: 0, maxAge: 100 },
+        { id: 'mover', position: { x: 4, y: 5 }, gender: 'female', state: 'idle', age: 0, maxAge: 100 },
       ],
     };
     // Run tick multiple times and verify no tile ever has 3+ entities

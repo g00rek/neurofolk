@@ -7,6 +7,10 @@ interface StatsProps {
 export function Stats({ world }: StatsProps) {
   const males = world.entities.filter(e => e.gender === 'male').length;
   const females = world.entities.filter(e => e.gender === 'female').length;
+  const mating = world.entities.filter(e => e.state === 'mating').length;
+  const avgAge = world.entities.length > 0
+    ? Math.round(world.entities.reduce((sum, e) => sum + e.age, 0) / world.entities.length)
+    : 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -20,10 +24,19 @@ export function Stats({ world }: StatsProps) {
           {'  '}
           <span style={{ color: '#f7768e' }}>&#9792; {females}</span>
         </div>
+        {mating > 0 && (
+          <div style={{ fontSize: '11px', color: '#bb9af7', marginTop: '4px' }}>
+            &#10084; {mating / 2} par
+          </div>
+        )}
       </div>
       <div style={panelStyle}>
-        <div style={labelStyle}>Tura</div>
+        <div style={labelStyle}>Tura (rok)</div>
         <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{world.tick}</div>
+      </div>
+      <div style={panelStyle}>
+        <div style={labelStyle}>Średni wiek</div>
+        <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{avgAge}</div>
       </div>
     </div>
   );

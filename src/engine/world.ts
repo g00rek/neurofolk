@@ -1,4 +1,5 @@
 import type { Entity, Position, WorldState } from './types';
+import { MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE } from './types';
 import { randomStep } from './movement';
 
 interface CreateWorldOptions {
@@ -7,35 +8,35 @@ interface CreateWorldOptions {
 }
 
 let nextId = 0;
-
 function generateId(): string {
   return `entity-${nextId++}`;
 }
 
-function posKey(p: Position): string {
-  return `${p.x},${p.y}`;
+function randomMaxAge(): number {
+  return 60 + Math.floor(Math.random() * 21); // 60-80
 }
 
-/** Returns all 4 orthogonal neighbors clamped to grid bounds (may include duplicates at edges — filtered by Set). */
-function neighbors(p: Position, gridSize: number): Position[] {
-  const candidates: Position[] = [
-    { x: p.x, y: p.y - 1 },
-    { x: p.x, y: p.y + 1 },
-    { x: p.x - 1, y: p.y },
-    { x: p.x + 1, y: p.y },
-  ];
-  return candidates.filter(
-    c => c.x >= 0 && c.x < gridSize && c.y >= 0 && c.y < gridSize,
+function isReproductive(e: Entity): boolean {
+  return e.age >= MIN_REPRODUCTIVE_AGE && e.age <= MAX_REPRODUCTIVE_AGE;
+}
+
+function createOccupancyGrid(gridSize: number, entities: Entity[]): number[][] {
+  const grid: number[][] = Array.from({ length: gridSize }, () =>
+    new Array(gridSize).fill(0)
   );
+  for (const e of entities) {
+    grid[e.position.y][e.position.x]++;
+  }
+  return grid;
 }
 
-/** Shuffle array in place (Fisher-Yates). */
-function shuffle<T>(arr: T[]): T[] {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
+function neighbors(p: Position, gridSize: number): Position[] {
+  const result: Position[] = [];
+  if (p.y > 0) result.push({ x: p.x, y: p.y - 1 });
+  if (p.y < gridSize - 1) result.push({ x: p.x, y: p.y + 1 });
+  if (p.x > 0) result.push({ x: p.x - 1, y: p.y });
+  if (p.x < gridSize - 1) result.push({ x: p.x + 1, y: p.y });
+  return result;
 }
 
 export function createWorld(options: CreateWorldOptions): WorldState {
@@ -51,6 +52,8 @@ export function createWorld(options: CreateWorldOptions): WorldState {
       },
       gender: i < entityCount / 2 ? 'male' : 'female',
       state: 'idle',
+      age: Math.floor(Math.random() * 31), // 0-30
+      maxAge: randomMaxAge(),
     });
   }
 
@@ -60,148 +63,112 @@ export function createWorld(options: CreateWorldOptions): WorldState {
 export function tick(state: WorldState): WorldState {
   const { gridSize } = state;
 
-  // --- Step 1: Complete matings ---
-  // Entities currently in 'mating' state → become 'idle' and spawn a new baby.
-  const matingPairs = new Map<string, Entity[]>();
+  // --- Step 0: Age all entities, remove dead ---
+  let entities: Entity[] = state.entities
+    .map(e => ({ ...e, age: e.age + 1 }))
+    .filter(e => e.age < e.maxAge);
 
-  for (const entity of state.entities) {
-    if (entity.state === 'mating') {
-      const key = posKey(entity.position);
-      const group = matingPairs.get(key) ?? [];
-      group.push(entity);
-      matingPairs.set(key, group);
+  // --- Step 1: Complete matings, spawn babies ---
+  const grid = createOccupancyGrid(gridSize, entities);
+  const babies: Entity[] = [];
+  const resolvedIds = new Set<string>();
+
+  // Group mating entities by tile using numeric key
+  const matingByTile = new Map<number, Entity[]>();
+  for (const e of entities) {
+    if (e.state === 'mating') {
+      const key = e.position.y * gridSize + e.position.x;
+      const group = matingByTile.get(key) ?? [];
+      group.push(e);
+      matingByTile.set(key, group);
     }
   }
 
-  // Resolve mating: for each tile with mating entities, pick the first male+female pair,
-  // mark them idle, and spawn a baby.
-  const resolvedIds = new Set<string>();
-  const newbornIds = new Set<string>();
-  const babies: Entity[] = [];
-
-  for (const [, group] of matingPairs) {
+  for (const [, group] of matingByTile) {
     const male = group.find(e => e.gender === 'male');
     const female = group.find(e => e.gender === 'female');
     if (male && female) {
       resolvedIds.add(male.id);
       resolvedIds.add(female.id);
 
-      // Find a neighboring tile with < 2 occupants for the baby.
-      // Use a temporary occupancy snapshot (all current entities).
-      const tempOccupancy = new Map<string, number>();
-      for (const e of state.entities) {
-        const k = posKey(e.position);
-        tempOccupancy.set(k, (tempOccupancy.get(k) ?? 0) + 1);
-      }
+      // Find birth position: random neighbor with < 2, else parent tile
+      const ns = neighbors(male.position, gridSize);
+      const free = ns.filter(n => grid[n.y][n.x] < 2);
+      const birthPos = free.length > 0
+        ? free[Math.floor(Math.random() * free.length)]
+        : { ...male.position };
 
-      const birthPos = (() => {
-        const ns = neighbors(male.position, gridSize);
-        const free = ns.filter(n => (tempOccupancy.get(posKey(n)) ?? 0) < 2);
-        if (free.length > 0) {
-          return free[Math.floor(Math.random() * free.length)];
-        }
-        // All neighbors full — spawn on parent tile (edge case)
-        return { ...male.position };
-      })();
-
-      const babyId = generateId();
-      newbornIds.add(babyId);
-      babies.push({
-        id: babyId,
+      const baby: Entity = {
+        id: generateId(),
         position: birthPos,
         gender: Math.random() < 0.5 ? 'male' : 'female',
         state: 'idle',
-      });
+        age: 0,
+        maxAge: randomMaxAge(),
+      };
+      babies.push(baby);
+      grid[birthPos.y][birthPos.x]++;
     }
   }
 
-  // Build the updated entity list after mating resolution (parents → idle).
-  // Track "just resolved" IDs so they don't immediately re-enter mating this tick.
-  const justResolvedIds = new Set(resolvedIds);
+  // Update resolved entities to idle, add babies
+  entities = entities.map(e =>
+    resolvedIds.has(e.id) ? { ...e, state: 'idle' as const } : e
+  );
+  entities.push(...babies);
 
-  const afterMatingEntities: Entity[] = state.entities.map(entity => {
-    if (resolvedIds.has(entity.id)) {
-      return { ...entity, state: 'idle' as const };
-    }
-    return entity;
-  });
-
-  // Add babies
-  const withBabies = [...afterMatingEntities, ...babies];
-
-  // --- Step 2: Build occupancy map ---
-  const occupancy = new Map<string, number>();
-  for (const entity of withBabies) {
-    const key = posKey(entity.position);
-    occupancy.set(key, (occupancy.get(key) ?? 0) + 1);
-  }
-
-  // --- Step 3: Detect new mating pairs ---
-  // For each tile with exactly 1 idle male + 1 idle female → set both to 'mating'.
-  const tileEntities = new Map<string, Entity[]>();
-  for (const entity of withBabies) {
-    const key = posKey(entity.position);
-    const group = tileEntities.get(key) ?? [];
-    group.push(entity);
-    tileEntities.set(key, group);
+  // --- Step 2: Detect new mating pairs ---
+  // Group by tile using numeric key
+  const tileGroups = new Map<number, Entity[]>();
+  for (const e of entities) {
+    const key = e.position.y * gridSize + e.position.x;
+    const group = tileGroups.get(key) ?? [];
+    group.push(e);
+    tileGroups.set(key, group);
   }
 
   const newMatingIds = new Set<string>();
-  for (const [, group] of tileEntities) {
-    // Skip entities that just finished mating — they can't immediately re-mate this tick.
-    const idleMales = group.filter(
-      e => e.gender === 'male' && e.state === 'idle' && !justResolvedIds.has(e.id),
+  for (const [, group] of tileGroups) {
+    const idleMale = group.find(
+      e => e.gender === 'male' && e.state === 'idle' && !resolvedIds.has(e.id) && isReproductive(e)
     );
-    const idleFemales = group.filter(
-      e => e.gender === 'female' && e.state === 'idle' && !justResolvedIds.has(e.id),
+    const idleFemale = group.find(
+      e => e.gender === 'female' && e.state === 'idle' && !resolvedIds.has(e.id) && isReproductive(e)
     );
-    if (idleMales.length >= 1 && idleFemales.length >= 1) {
-      newMatingIds.add(idleMales[0].id);
-      newMatingIds.add(idleFemales[0].id);
+    if (idleMale && idleFemale) {
+      newMatingIds.add(idleMale.id);
+      newMatingIds.add(idleFemale.id);
     }
   }
 
-  const afterMatingDetection: Entity[] = withBabies.map(entity => {
-    if (newMatingIds.has(entity.id)) {
-      return { ...entity, state: 'mating' as const };
-    }
-    return entity;
-  });
+  entities = entities.map(e =>
+    newMatingIds.has(e.id) ? { ...e, state: 'mating' as const } : e
+  );
 
-  // --- Step 4: Move idle entities ---
-  // Process in random order to avoid positional bias.
-  const shuffled = shuffle([...afterMatingDetection.map((_, i) => i)]);
-  const result: Entity[] = [...afterMatingDetection];
+  // Rebuild grid after births (occupancy shifted from babies)
+  const moveGrid = createOccupancyGrid(gridSize, entities);
 
-  // Rebuild occupancy for movement (reflects current positions after steps 1–3).
-  const moveOccupancy = new Map<string, number>();
-  for (const entity of afterMatingDetection) {
-    const key = posKey(entity.position);
-    moveOccupancy.set(key, (moveOccupancy.get(key) ?? 0) + 1);
+  // --- Step 3: Move idle entities ---
+  // Shuffle indices for fairness
+  const indices = Array.from({ length: entities.length }, (_, i) => i);
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
   }
 
-  for (const idx of shuffled) {
-    const entity = result[idx];
-    // Skip mating entities and newborns (newborns don't move the tick they're born)
-    if (entity.state !== 'idle') continue;
-    if (newbornIds.has(entity.id)) continue;
+  const babyIds = new Set(babies.map(b => b.id));
+
+  for (const idx of indices) {
+    const entity = entities[idx];
+    if (entity.state !== 'idle' || babyIds.has(entity.id)) continue;
 
     const target = randomStep(entity.position, gridSize);
-    const targetKey = posKey(target);
-    const currentKey = posKey(entity.position);
-
-    if ((moveOccupancy.get(targetKey) ?? 0) < 2) {
-      // Move: update occupancy
-      moveOccupancy.set(currentKey, (moveOccupancy.get(currentKey) ?? 1) - 1);
-      moveOccupancy.set(targetKey, (moveOccupancy.get(targetKey) ?? 0) + 1);
-      result[idx] = { ...entity, position: target };
+    if (moveGrid[target.y][target.x] < 2) {
+      moveGrid[entity.position.y][entity.position.x]--;
+      moveGrid[target.y][target.x]++;
+      entities[idx] = { ...entity, position: target };
     }
-    // Otherwise: entity stays put (tile is full)
   }
 
-  return {
-    ...state,
-    tick: state.tick + 1,
-    entities: result,
-  };
+  return { ...state, tick: state.tick + 1, entities };
 }
