@@ -43,9 +43,9 @@ export function generateBiomeGrid(gridSize: number): Biome[][] {
       const moisture = fbm(x, y, seed + 500);
 
       let biome: Biome;
-      if (elevation < 0.3) {
+      if (elevation < 0.25) {
         biome = 'water';
-      } else if (elevation > 0.75) {
+      } else if (elevation > 0.6) {
         biome = 'mountain';
       } else if (moisture > 0.55) {
         biome = 'forest';
