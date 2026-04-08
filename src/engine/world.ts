@@ -6,7 +6,7 @@ import {
   ENERGY_MATING_MIN, HUNGER_THRESHOLD, CHILD_AGE, TRAIT_ENERGY_COST,
   BASE_FOOD_SENSE_RANGE, ANIMAL_COUNT, PLANT_COUNT, PLANT_RESPAWN_INTERVAL,
   PLANT_GROW_TIME, FIGHT_MIN_AGE, MEAT_PORTIONS_PER_HUNT,
-  CHOPPING_DURATION, BUILDING_DURATION,
+  CHOPPING_DURATION, BUILDING_DURATION, SPEED_MULTIPLIER,
   ANIMAL_REPRO_INTERVAL, ANIMAL_MAX, ANIMAL_FLEE_RANGE, FOREST_SPEED_PENALTY, FOREST_PLANT_BONUS, VILLAGE_RADIUS, VILLAGE_OPTIMAL_POP,
 } from './types';
 import { generateBiomeGrid, isPassable, isPassableForRonin } from './biomes';
@@ -805,7 +805,8 @@ export function tick(state: WorldState): WorldState {
     if (entity.state !== 'idle' || babyIds.has(entity.id)) continue;
 
     const inForest = biomes[entity.position.y][entity.position.x] === 'forest';
-    const steps = Math.max(1, entity.traits.speed - (inForest ? FOREST_SPEED_PENALTY : 0));
+    const rawSpeed = Math.max(1, entity.traits.speed - (inForest ? FOREST_SPEED_PENALTY : 0));
+    const steps = rawSpeed * SPEED_MULTIPLIER;
     const senseFood = foodSenseRange(entity);
     const senseMate = pheromoneRange(entity);
 

@@ -79,8 +79,9 @@ export interface Plant {
 export const PLANT_GROW_TIME = 60; // ~2 months to mature
 export const FOREST_REGROW_TIME = 360; // ~3 years for chopped forest to regrow
 export const FIGHT_MIN_AGE = 16;
-export const CHOPPING_DURATION = 3;
-export const BUILDING_DURATION = 5;
+export const CHOPPING_DURATION = 1; // 1 day
+export const BUILDING_DURATION = 3; // 3 days
+export const SPEED_MULTIPLIER = 5;  // trait speed × this = steps per day
 
 export interface House {
   id: string;
@@ -97,11 +98,11 @@ export const TICKS_PER_YEAR = 120; // 1 tick = 1 day, 10 days/month, 12 months/y
 export const BASE_PHEROMONE_RANGE = 1; // added to perception for mate sensing
 
 // Actions
-export const MATING_DURATION = 1;
-export const PREGNANCY_DURATION = 90; // 9 months
-export const FIGHTING_DURATION = 3;
-export const HUNTING_DURATION = 3;
-export const GATHERING_DURATION = 2;
+export const MATING_DURATION = 1;   // instant (evening)
+export const PREGNANCY_DURATION = 270; // 9 months in days
+export const FIGHTING_DURATION = 1;  // 1 day
+export const HUNTING_DURATION = 1;   // 1 day
+export const GATHERING_DURATION = 1; // 1 day
 
 // Energy
 export const ENERGY_MAX = 100;
