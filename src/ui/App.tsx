@@ -26,20 +26,26 @@ export function App() {
 
   const extinct = world.entities.length === 0 && world.tick > 0;
 
+  // At very high speed, run multiple ticks per frame
+  const ticksPerFrame = speed <= 5 ? 10 : speed <= 10 ? 5 : 1;
+
   const step = useCallback(() => {
     setWorld(prev => {
-      if (prev.entities.length === 0) return prev;
-      const next = tick(prev);
-      if (next.tick % POP_SAMPLE_INTERVAL === 0) {
-        setHistory(h => {
-          const pop = [0, 1, 2, -1].map(t => next.entities.filter(e => e.tribe === t).length);
-          const updated = [...h, { pop }];
-          return updated.length > 200 ? updated.slice(-200) : updated;
-        });
+      let state = prev;
+      for (let i = 0; i < ticksPerFrame; i++) {
+        if (state.entities.length === 0) return state;
+        state = tick(state);
+        if (state.tick % POP_SAMPLE_INTERVAL === 0) {
+          setHistory(h => {
+            const pop = [0, 1, 2, -1].map(t => state.entities.filter(e => e.tribe === t).length);
+            const updated = [...h, { pop }];
+            return updated.length > 200 ? updated.slice(-200) : updated;
+          });
+        }
       }
-      return next;
+      return state;
     });
-  }, []);
+  }, [ticksPerFrame]);
 
   useEffect(() => {
     if (!running || extinct) return;

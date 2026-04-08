@@ -155,7 +155,7 @@ function stateLabel(entity: Entity): string {
         if (entity.gender === 'male' && entity.meat > 0) return '💑 Seeking mate';
         if (entity.gender === 'female') return '💑 Seeking mate';
       }
-      return '🏠 Resting';
+      return '🚶 Strolling';
     }
     default: return entity.state;
   }

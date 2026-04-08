@@ -163,7 +163,12 @@ export function decideAction(ctx: AIContext): AIAction {
     scores.push({ score: 0.1, action: () => ({ type: 'wander' }) });
   }
 
-  // Rest (lowest priority)
+  // Default: stroll around village (never just stand still)
+  if (ctx.inVillage) {
+    scores.push({ score: 0.02, action: () => ({ type: 'play' }) });
+  }
+
+  // Absolute fallback
   scores.push({ score: 0.01, action: () => ({ type: 'rest' }) });
 
   // Pick highest score
