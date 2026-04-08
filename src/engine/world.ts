@@ -397,12 +397,15 @@ function detectInteractions(
       }
     }
 
-    // Same-tribe training
+    // Same-tribe training — only when truly idle (has house, has partner, pantry full, not carrying wood)
     if (!fightStarted) {
-      const sameTribeMales = fightableMales.filter(e => !newActionIds.has(e.id) && e.tribe >= 0);
-      if (sameTribeMales.length >= 2 && sameTribeMales[0].tribe === sameTribeMales[1].tribe) {
-        newActionIds.add(sameTribeMales[0].id);
-        newActionIds.add(sameTribeMales[1].id);
+      const trulyIdle = fightableMales.filter(e =>
+        !newActionIds.has(e.id) && e.tribe >= 0
+        && !!e.homeId && !!e.partnerId && !e.carryingWood
+      );
+      if (trulyIdle.length >= 2 && trulyIdle[0].tribe === trulyIdle[1].tribe) {
+        newActionIds.add(trulyIdle[0].id);
+        newActionIds.add(trulyIdle[1].id);
       }
     }
   }
