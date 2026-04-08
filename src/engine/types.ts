@@ -54,7 +54,7 @@ export interface Entity {
   partnerTribe?: TribeId;
 }
 
-export const MEAT_PORTIONS_PER_HUNT = 20;
+export const MEAT_PORTIONS_PER_HUNT = 8;
 
 // Traits
 export const TRAIT_ENERGY_COST = 0.15; // extra energy drain per total trait points above baseline
@@ -113,7 +113,7 @@ export const GATHERING_DURATION = 0; // instant on contact
 export const ENERGY_MAX = 100;
 export const ENERGY_START = 80;
 export const ENERGY_DRAIN_INTERVAL = 200; // lose 1 energy every ~10 days (200 ticks)
-export const ENERGY_MEAT = 50;
+export const ENERGY_MEAT = 30;
 export const ENERGY_PLANT = 35;
 export const ENERGY_MATING_MIN = 30;
 export const HUNGER_THRESHOLD = 40; // eat from pantry when truly hungry

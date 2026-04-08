@@ -27,7 +27,7 @@ export function App() {
   const extinct = world.entities.length === 0 && world.tick > 0;
 
   // At very high speed, run multiple ticks per frame
-  const ticksPerFrame = speed <= 5 ? 10 : speed <= 10 ? 5 : 1;
+  const ticksPerFrame = speed <= 2 ? 50 : speed <= 5 ? 20 : speed <= 10 ? 10 : speed <= 20 ? 5 : 1;
 
   const step = useCallback(() => {
     setWorld(prev => {
