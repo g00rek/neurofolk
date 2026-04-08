@@ -394,9 +394,9 @@ function detectInteractions(
         return e.energy >= minEnergy;
       });
       if (male) {
-        // Find his partner (female living in his house)
+        // Find his partner (in his house) OR any unhoused reproductive female on same tile
         const female = idleFemales.find(e =>
-          isReproductive(e) && e.homeId === male.homeId && e.state === 'idle'
+          isReproductive(e) && e.state === 'idle' && (e.homeId === male.homeId || !e.homeId)
         );
         if (female) {
           newActionIds.add(male.id);
@@ -988,6 +988,22 @@ export function tick(state: WorldState): WorldState {
         else entities[i] = { ...e, energy: Math.min(ENERGY_MAX, e.energy + ENERGY_PLANT) };
         continue;
       }
+    }
+
+    // Chopping: male without house, on forest, not carrying wood
+    if (e.gender === 'male' && !isChild(e) && !e.homeId && !e.carryingWood
+        && biomes[e.position.y][e.position.x] === 'forest') {
+      entities[i] = { ...e, state: 'chopping', stateTimer: CHOPPING_DURATION };
+      continue;
+    }
+
+    // Building: male with wood, in own village, on empty tile
+    const postBuildV = e.tribe >= 0 ? updatedVillages.find(v => v.tribe === e.tribe) : undefined;
+    if (e.gender === 'male' && e.carryingWood && postBuildV
+        && isInVillage(e.position, postBuildV)
+        && !houses.some(h => h.position.x === e.position.x && h.position.y === e.position.y)) {
+      entities[i] = { ...e, state: 'building', stateTimer: BUILDING_DURATION };
+      continue;
     }
   }
 
