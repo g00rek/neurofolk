@@ -12,7 +12,8 @@ export type AIAction =
   | { type: 'return_home' }
   | { type: 'go_gather'; target: Position }
   | { type: 'leave_village' }   // walk toward edge to exit
-  | { type: 'wander' };         // random step (ronins)
+  | { type: 'wander' }          // random step (ronins)
+  | { type: 'play' };           // random step within village (children)
 
 // --- Context for scoring ---
 export interface AIContext {
@@ -86,10 +87,10 @@ export function getScores(ctx: AIContext): Record<string, number> {
 export function decideAction(ctx: AIContext): AIAction {
   const e = ctx.entity;
 
-  // Children always stay/return
+  // Children: return if outside village, wander inside village
   if (ageInYears(e) < CHILD_AGE) {
     if (!ctx.inVillage && ctx.village) return { type: 'return_home' };
-    return { type: 'rest' };
+    return { type: 'play' }; // run around in village
   }
 
   // Night: everyone returns home, in village = rest

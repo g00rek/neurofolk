@@ -866,6 +866,13 @@ export function tick(state: WorldState): WorldState {
         case 'wander':
           target = randomStepBiome(entity.position, gridSize, biomes);
           break;
+        case 'play': {
+          // Random step but stay within village
+          const playTarget = randomStepBiome(entity.position, gridSize, biomes);
+          const pv = getVillage(entity.tribe);
+          if (pv && isInVillage(playTarget, pv)) target = playTarget;
+          break;
+        }
       }
 
       if (target && moveGrid[target.y][target.x] < 2 && canEnterTile(target, entity.tribe, villages)) {
