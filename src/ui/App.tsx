@@ -173,6 +173,7 @@ export function App() {
           {selectedEntity && (
             <EntityPanel
               entity={selectedEntity}
+              world={world}
               onClose={() => setSelectedId(null)}
             />
           )}

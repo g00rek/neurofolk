@@ -1,13 +1,15 @@
-import type { Entity } from '../engine/types';
+import type { Entity, WorldState } from '../engine/types';
 import { HUNGER_THRESHOLD, ENERGY_MATING_MIN, CHILD_AGE, MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE } from '../engine/types';
 import { ageInYears } from '../engine/world';
+import { buildAIContext, getScores, decideAction } from '../engine/utility-ai';
 
 interface EntityPanelProps {
   entity: Entity;
+  world: WorldState;
   onClose: () => void;
 }
 
-export function EntityPanel({ entity, onClose }: EntityPanelProps) {
+export function EntityPanel({ entity, world, onClose }: EntityPanelProps) {
   const color = `rgb(${entity.color[0]},${entity.color[1]},${entity.color[2]})`;
 
   return (
@@ -102,6 +104,22 @@ export function EntityPanel({ entity, onClose }: EntityPanelProps) {
         <span style={dimStyle}>Position:</span>
         <span>{entity.position.x},{entity.position.y}</span>
       </div>
+      {(() => {
+        const ctx = buildAIContext(entity, world.villages, world.animals, world.plants, world.entities, world.biomes, world.gridSize);
+        const scores = getScores(ctx);
+        const action = decideAction(ctx);
+        return (
+          <>
+            <div style={{ ...labelStyle, marginTop: '8px' }}>AI Debug</div>
+            <div style={{ fontSize: '10px', color: '#666' }}>
+              {Object.entries(scores).map(([k, v]) => (
+                <div key={k}>{k}: {v.toFixed(2)}</div>
+              ))}
+              <div style={{ color: '#9ece6a', marginTop: '2px' }}>→ {action.type}</div>
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }

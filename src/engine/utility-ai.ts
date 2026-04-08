@@ -70,6 +70,17 @@ function scoreReturnHome(ctx: AIContext): number {
 
 // --- Main decision function ---
 
+// Exposed for debug
+export function getScores(ctx: AIContext): Record<string, number> {
+  return {
+    survival: scoreSurvival(ctx),
+    buildHome: scoreBuildHome(ctx),
+    hunt: scoreHunt(ctx),
+    gather: scoreGather(ctx),
+    returnHome: scoreReturnHome(ctx),
+  };
+}
+
 export function decideAction(ctx: AIContext): AIAction {
   const e = ctx.entity;
 
