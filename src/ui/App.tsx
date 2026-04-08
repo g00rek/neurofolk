@@ -170,6 +170,13 @@ export function App() {
           </div>
         </div>
         <div style={sidebarStyle}>
+          <Controls
+            running={running}
+            speed={speed}
+            onToggle={() => setRunning(r => !r)}
+            onSpeedChange={setSpeed}
+            onReset={handleReset}
+          />
           {selectedEntity && (
             <EntityPanel
               entity={selectedEntity}
@@ -179,13 +186,6 @@ export function App() {
           )}
           <Stats world={world} />
           <TraitAverages entities={world.entities} />
-          <Controls
-            running={running}
-            speed={speed}
-            onToggle={() => setRunning(r => !r)}
-            onSpeedChange={setSpeed}
-            onReset={handleReset}
-          />
         </div>
       </div>
     </div>
