@@ -298,6 +298,10 @@ export function GridCanvas({ world, size, selectedId, onClick }: GridCanvasProps
     ctx.lineWidth = 0.5;
     for (const entity of world.entities) {
       if (entity.state !== 'idle' || ageInYears(entity) < CHILD_AGE) continue;
+      // Only show lines for entities outside their village (actively foraging)
+      const eVillage = world.villages.find(v => v.tribe === entity.tribe);
+      const inVillage = eVillage && Math.abs(entity.position.x - eVillage.center.x) + Math.abs(entity.position.y - eVillage.center.y) <= eVillage.radius;
+      if (inVillage) continue;
       const ex = entity.position.x * cellSize + cellSize / 2;
       const ey = entity.position.y * cellSize + cellSize / 2;
       const sense = 3 + entity.traits.perception * 2;
