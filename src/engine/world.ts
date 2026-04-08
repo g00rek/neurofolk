@@ -237,11 +237,11 @@ export function createWorld(options: CreateWorldOptions): WorldState {
   const biomes = generateBiomeGrid(gridSize);
 
   // Village definitions (up to 3)
-  const allTribeColors: RGB[] = [[220, 60, 60], [60, 180, 60], [60, 100, 220]];
-  const allTribeNames = ['Red Tribe', 'Green Tribe', 'Blue Tribe'];
+  const allTribeColors: RGB[] = [[220, 60, 60], [60, 100, 220], [60, 180, 60]];
+  const allTribeNames = ['Red Tribe', 'Blue Tribe', 'Green Tribe'];
   const allCenters: Position[] = [
-    { x: Math.floor(gridSize * 0.2), y: Math.floor(gridSize * 0.2) },
-    { x: Math.floor(gridSize * 0.8), y: Math.floor(gridSize * 0.2) },
+    { x: Math.floor(gridSize * 0.2), y: Math.floor(gridSize * 0.5) },
+    { x: Math.floor(gridSize * 0.8), y: Math.floor(gridSize * 0.5) },
     { x: Math.floor(gridSize * 0.5), y: Math.floor(gridSize * 0.8) },
   ];
   const tribeColors = allTribeColors.slice(0, numVillages);
