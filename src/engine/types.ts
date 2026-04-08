@@ -114,9 +114,9 @@ export const GATHERING_DURATION = 0; // instant on contact
 // Energy
 export const ENERGY_MAX = 100;
 export const ENERGY_START = 80;
-export const ENERGY_DRAIN_INTERVAL = 200; // lose 1 energy every ~10 days (200 ticks)
-export const ENERGY_MEAT = 30;
-export const ENERGY_PLANT = 35;
+export const ENERGY_DRAIN_INTERVAL = 10; // lose 1 energy every half day (200 ticks)
+export const ENERGY_MEAT = 15;
+export const ENERGY_PLANT = 10;
 export const ENERGY_MATING_MIN = 30;
 export const HUNGER_THRESHOLD = 40; // eat from pantry when truly hungry
 export const CHILD_AGE = 3; // children don't work/fight/lose energy (years)
