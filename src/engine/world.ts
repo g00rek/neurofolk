@@ -261,7 +261,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
           const nx = vc.x + dx;
           const ny = vc.y + dy;
           if (nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize) {
-            if (!isPassable(biomes[ny][nx])) biomes[ny][nx] = 'plains';
+            if (biomes[ny][nx] !== 'plains') biomes[ny][nx] = 'plains';
           }
         }
       }
