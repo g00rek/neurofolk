@@ -36,4 +36,7 @@ function logSaverPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [react(), logSaverPlugin()],
+  server: {
+    allowedHosts: ['evod.g00rek.ovh'],
+  },
 })

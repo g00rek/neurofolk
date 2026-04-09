@@ -16,6 +16,7 @@ export interface Traits {
   aggression: number;    // 0-10: 0 = always flee, 10 = always fight
   fertility: number;     // 0.5-2.0: higher = shorter mating time but shorter maxAge
   twinChance: number;   // 0-1: chance of multiple births (0=always single, 1=always multiples)
+  pheromoneRange: number; // 1-4: tiles within which male can impregnate female
 }
 
 export type TribeId = number; // 0/1/2 = starting tribes
@@ -61,10 +62,10 @@ export interface Entity {
   hungerThreshold?: number; // personal hunger threshold for direct eating decisions
   tribe: TribeId;
   homeId?: string;
-  partnerId?: string;    // bonded partner
   birthCooldown: number; // ticks until next pregnancy allowed (0 = ready)
-  partnerTraits?: Traits; // stored father's traits during pregnancy
-  partnerTribe?: TribeId;
+  mateCooldown: number;  // ticks until male can impregnate again (0 = ready)
+  fatherTraits?: Traits; // stored father's traits during pregnancy
+  fatherTribe?: TribeId;
   coldExposure?: boolean; // set when winter cold penalty was applied this tick
   goal?: EntityGoal;
 }
@@ -108,12 +109,14 @@ export const TICKS_PER_DAY = 20; // 10 day + 10 night
 export const DAY_TICKS = 10;     // first 10 ticks = daytime
 export const NIGHT_TICKS = 10;   // last 10 ticks = nighttime
 
+export const PHEROMONE_CHANCE = 0.15;  // 15% chance per tick when in range
+export const MATE_COOLDOWN = 200;      // ticks after impregnation before male can mate again
+
 export interface House {
   id: string;
   position: Position;
   tribe: TribeId;
-  ownerId: string; // male who built it
-  partnerId?: string; // female living there
+  occupantId?: string; // female who lives here
 }
 
 // Population (gameplay-tuned)
@@ -148,8 +151,8 @@ export const PLANT_RESERVE_MIN = 20;
 export const PLANT_DETECTION_MULTIPLIER = 3;
 
 // Resources
-export const ANIMAL_COUNT = 30;
-export const PLANT_COUNT = 30;
+export const ANIMAL_COUNT = 8;
+export const PLANT_COUNT = 8;
 export const PLANT_MAX = 300;
 export const PLANT_RESPAWN_INTERVAL = 100; // new plant every ~5 days
 

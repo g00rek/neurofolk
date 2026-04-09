@@ -1,5 +1,5 @@
 import type { Entity, WorldState } from '../engine/types';
-import { HUNGER_THRESHOLD, ENERGY_MATING_MIN, CHILD_AGE, MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE } from '../engine/types';
+import { CHILD_AGE } from '../engine/types';
 import { ageInYears } from '../engine/world';
 import { buildAIContext, getScores, decideAction } from '../engine/utility-ai';
 
@@ -87,25 +87,38 @@ export function EntityPanel({ entity, world, onClose }: EntityPanelProps) {
         <Bar value={entity.traits.twinChance} max={0.5} color="#73daca" />
       </div>
       <div style={rowStyle}>
+        <span style={dimStyle}>Pheromone:</span>
+        <span>{entity.traits.pheromoneRange}</span>
+        <Bar value={entity.traits.pheromoneRange} max={4} color="#ff9e64" />
+      </div>
+      <div style={rowStyle}>
         <span style={dimStyle}>Tribe:</span>
         <span style={{ color: '#ccc' }}>
           {['Red', 'Blue', 'Green'][entity.tribe] ?? `Tribe ${entity.tribe}`}
         </span>
       </div>
       <div style={rowStyle}>
-        <span style={dimStyle}>Partner:</span>
-        <span>{entity.partnerId ?? 'single'}</span>
-      </div>
-      <div style={rowStyle}>
         <span style={dimStyle}>Home:</span>
         <span>{entity.homeId ?? 'none'}</span>
       </div>
+      {entity.gender === 'male' && entity.mateCooldown > 0 && (
+        <div style={rowStyle}>
+          <span style={dimStyle}>Mate CD:</span>
+          <span>{entity.mateCooldown}t</span>
+        </div>
+      )}
+      {entity.gender === 'female' && entity.birthCooldown > 0 && (
+        <div style={rowStyle}>
+          <span style={dimStyle}>Birth CD:</span>
+          <span>{entity.birthCooldown}t</span>
+        </div>
+      )}
       <div style={rowStyle}>
         <span style={dimStyle}>Position:</span>
         <span>{entity.position.x},{entity.position.y}</span>
       </div>
       {(() => {
-        const ctx = buildAIContext(entity, world.villages, world.animals, world.plants, world.entities, world.biomes, world.gridSize);
+        const ctx = buildAIContext(entity, world.villages, world.animals, world.plants, world.entities, world.biomes, world.gridSize, 0, world.houses);
         const scores = getScores(ctx);
         const action = decideAction(ctx);
         return (

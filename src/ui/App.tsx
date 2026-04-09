@@ -5,15 +5,13 @@ import { Stats } from './Stats';
 import { Controls } from './Controls';
 import { EntityPanel } from './EntityPanel';
 import { PopGraph } from './PopGraph';
-import { TraitAverages } from './TraitAverages';
 import { EventLog } from './EventLog';
 import type { WorldState } from '../engine/types';
 import { TICKS_PER_YEAR } from '../engine/types';
 
-const CANVAS_SIZE = 760;
-const WORLD_GRID_SIZE = 40;
-const INITIAL_ENTITY_COUNT = 12;
-const VILLAGE_COUNT = 2;
+const WORLD_GRID_SIZE = 20;
+const INITIAL_ENTITY_COUNT = 4;
+const VILLAGE_COUNT = 1;
 const INITIAL_SPEED = 300;
 
 interface HistoryPoint {
@@ -150,90 +148,67 @@ export function App() {
     workerRef.current?.postMessage({ type: 'reset', world: nextWorld, speed });
   }, [speed]);
 
+  const v = world.villages[0];
+  const meatPct = v ? Math.min(100, Math.round((v.meatStore / 50) * 100)) : 0;
+  const plantPct = v ? Math.min(100, Math.round((v.plantStore / 50) * 100)) : 0;
+  const woodPct = v ? Math.min(100, Math.round((v.woodStore / 30) * 100)) : 0;
+
   return (
     <div style={containerStyle}>
-      <h1 style={{ margin: '0 0 16px', fontSize: '20px', color: '#ccc' }}>
-        Evoliso
-      </h1>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+        <h1 style={{ margin: 0, fontSize: '18px', color: '#ccc' }}>Evoliso</h1>
+        <Controls
+          running={running}
+          speed={speed}
+          onToggle={() => setRunning(r => !r)}
+          onSpeedChange={setSpeed}
+          onReset={handleReset}
+        />
+      </div>
       {extinct && (
-        <div style={{ background: '#f7768e22', border: '1px solid #f7768e', borderRadius: '4px', padding: '12px 20px', marginBottom: '16px', fontSize: '16px' }}>
-          Civilization extinct in year {Math.floor(world.tick / TICKS_PER_YEAR)} (tick {world.tick})
+        <div style={{ background: '#f7768e22', border: '1px solid #f7768e', borderRadius: '4px', padding: '8px 12px', marginBottom: '8px', fontSize: '14px' }}>
+          Extinct in year {Math.floor(world.tick / TICKS_PER_YEAR)}
         </div>
       )}
-      <div style={layoutStyle}>
-        <div>
-          <GridCanvas
-            world={world}
-            size={CANVAS_SIZE}
-            selectedId={selectedId}
-            onClick={handleCanvasClick}
-          />
-          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-            <div style={graphPanelStyle}>
-              <div style={labelStyle}>Population</div>
-              <PopGraph series={[
-                { data: history.map(h => h.pop[0]), color: '#dc3c3c', label: 'Red' },
-                { data: history.map(h => h.pop[1]), color: '#3c64dc', label: 'Blu' },
-                { data: history.map(h => h.pop[2]), color: '#3cb43c', label: 'Grn' },
-              ]} width={290} height={80} />
-            </div>
-            <div style={graphPanelStyle}>
-              <div style={labelStyle}>Pantry</div>
-              {world.villages.map(v => {
-                const maxStore = 50;
-                const meatPct = Math.min(100, Math.round((v.meatStore / maxStore) * 100));
-                const plantPct = Math.min(100, Math.round((v.plantStore / maxStore) * 100));
-                const c = `rgb(${v.color.join(',')})`;
-                return (
-                  <div key={v.tribe} style={{ marginBottom: '6px' }}>
-                    <div style={{ fontSize: '10px', color: c, marginBottom: '2px' }}>{v.name}</div>
-                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                      <span style={{ fontSize: '9px', color: '#8d6e63', width: '12px' }}>&#127830;</span>
-                      <div style={{ flex: 1, height: '6px', background: '#333', borderRadius: '3px' }}>
-                        <div style={{ width: `${meatPct}%`, height: '100%', background: '#8d6e63', borderRadius: '3px' }} />
-                      </div>
-                      <span style={{ fontSize: '9px', color: '#666', width: '20px' }}>{v.meatStore}</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginTop: '2px' }}>
-                      <span style={{ fontSize: '9px', color: '#4caf50', width: '12px' }}>&#127807;</span>
-                      <div style={{ flex: 1, height: '6px', background: '#333', borderRadius: '3px' }}>
-                        <div style={{ width: `${plantPct}%`, height: '100%', background: '#4caf50', borderRadius: '3px' }} />
-                      </div>
-                      <span style={{ fontSize: '9px', color: '#666', width: '20px' }}>{v.plantStore}</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginTop: '2px' }}>
-                      <span style={{ fontSize: '9px', color: '#a08050', width: '12px' }}>&#129717;</span>
-                      <div style={{ flex: 1, height: '6px', background: '#333', borderRadius: '3px' }}>
-                        <div style={{ width: `${Math.min(100, Math.round((v.woodStore / 30) * 100))}%`, height: '100%', background: '#a08050', borderRadius: '3px' }} />
-                      </div>
-                      <span style={{ fontSize: '9px', color: '#666', width: '20px' }}>{v.woodStore}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <EventLog log={world.log} />
+      <GridCanvas
+        world={world}
+        size={600}
+        selectedId={selectedId}
+        onClick={handleCanvasClick}
+      />
+      {v && (
+        <div style={resourceBarStyle}>
+          <ResourceBar emoji={'\uD83C\uDF56'} color="#8d6e63" pct={meatPct} val={v.meatStore} />
+          <ResourceBar emoji={'\uD83C\uDF3F'} color="#4caf50" pct={plantPct} val={v.plantStore} />
+          <ResourceBar emoji={'\uD83E\uDEB5'} color="#a08050" pct={woodPct} val={v.woodStore} />
         </div>
-        <div style={sidebarStyle}>
-          <Controls
-            running={running}
-            speed={speed}
-            onToggle={() => setRunning(r => !r)}
-            onSpeedChange={setSpeed}
-            onReset={handleReset}
-          />
-          {selectedEntity && (
-            <EntityPanel
-              entity={selectedEntity}
-              world={world}
-              onClose={() => setSelectedId(null)}
-            />
-          )}
-          <Stats world={world} />
-          <TraitAverages entities={world.entities} />
-        </div>
+      )}
+      <div style={graphPanelStyle}>
+        <PopGraph series={[
+          { data: history.map(h => h.pop[0]), color: '#dc3c3c', label: 'Pop' },
+        ]} width={300} height={60} />
       </div>
+      {selectedEntity && (
+        <EntityPanel
+          entity={selectedEntity}
+          world={world}
+          onClose={() => setSelectedId(null)}
+        />
+      )}
+      <Stats world={world} />
+      <EventLog log={world.log} />
+    </div>
+  );
+}
+
+function ResourceBar({ emoji, color, pct, val }: { emoji: string; color: string; pct: number; val: number }) {
+  return (
+    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flex: 1 }}>
+      <span style={{ fontSize: '11px', color }}>{emoji}</span>
+      <div style={{ flex: 1, height: '6px', background: '#333', borderRadius: '3px' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '3px' }} />
+      </div>
+      <span style={{ fontSize: '10px', color: '#666', minWidth: '16px' }}>{val}</span>
     </div>
   );
 }
@@ -242,34 +217,26 @@ const containerStyle: React.CSSProperties = {
   background: '#16161e',
   color: '#ccc',
   minHeight: '100vh',
-  padding: '24px',
+  padding: '12px',
   fontFamily: 'system-ui, -apple-system, sans-serif',
+  maxWidth: '600px',
+  margin: '0 auto',
 };
 
-const layoutStyle: React.CSSProperties = {
+const resourceBarStyle: React.CSSProperties = {
   display: 'flex',
-  gap: '16px',
-  alignItems: 'flex-start',
-};
-
-const sidebarStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '12px',
-  width: '200px',
-};
-
-const labelStyle: React.CSSProperties = {
-  color: '#888',
-  fontSize: '11px',
-  textTransform: 'uppercase',
-  marginBottom: '8px',
+  gap: '8px',
+  marginTop: '8px',
+  padding: '8px',
+  background: '#1a1b26',
+  border: '1px solid #333',
+  borderRadius: '4px',
 };
 
 const graphPanelStyle: React.CSSProperties = {
   background: '#1a1b26',
   border: '1px solid #333',
   borderRadius: '4px',
-  padding: '12px',
-  flex: 1,
+  padding: '8px',
+  marginTop: '8px',
 };

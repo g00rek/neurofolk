@@ -1,7 +1,7 @@
 import type { Entity, Animal, Plant, House, Position, WorldState, RGB, Traits, LogEntry, Biome, Village, TribeId } from './types';
 import {
   MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE, TICKS_PER_YEAR,
-  PREGNANCY_DURATION, BIRTH_COOLDOWN, INFANT_MORTALITY, MATERNAL_MORTALITY, FIGHTING_DURATION, TICKS_PER_DAY, DAY_TICKS,
+  PREGNANCY_DURATION, BIRTH_COOLDOWN, INFANT_MORTALITY, MATERNAL_MORTALITY, FIGHTING_DURATION, TICKS_PER_DAY, DAY_TICKS, PHEROMONE_CHANCE, MATE_COOLDOWN,
   ENERGY_MAX, ENERGY_START, ENERGY_DRAIN_INTERVAL, ENERGY_MEAT, ENERGY_PLANT,
   FOOD_RESERVE_MAX, FOOD_RESERVE_MIN, FOOD_RESERVE_PER_PERSON, HUNGER_THRESHOLD, CHILD_AGE, TRAIT_ENERGY_COST, PLANT_RESERVE_MIN,
   ANIMAL_COUNT, PLANT_COUNT, PLANT_MAX, PLANT_RESPAWN_INTERVAL,
@@ -119,6 +119,7 @@ function randomTraits(): Traits {
     aggression: Math.floor(Math.random() * 4) + 1,          // 1-4 (low start, evolution decides)
     fertility: +(0.8 + Math.random() * 0.4).toFixed(2),     // 0.8-1.2
     twinChance: +(Math.random() * 0.1).toFixed(2),         // 0-0.1 (low on start)
+    pheromoneRange: Math.floor(Math.random() * 3) + 1,     // 1-3 (low on start)
   };
 }
 
@@ -138,17 +139,19 @@ function inheritTraits(a: Traits, b: Traits): Traits {
     aggression: inheritTrait(a.aggression, b.aggression, 0, 10, 1),
     fertility: inheritTrait(a.fertility, b.fertility, 0.5, 2.0, 0.1),
     twinChance: inheritTrait(a.twinChance, b.twinChance, 0, 0.5, 0.05),
+    pheromoneRange: inheritTrait(a.pheromoneRange, b.pheromoneRange, 1, 4, 0.5),
   };
   // Round integer traits
   traits.strength = Math.round(traits.strength);
   traits.speed = Math.round(traits.speed);
   traits.perception = Math.round(traits.perception);
   traits.aggression = Math.round(traits.aggression);
+  traits.pheromoneRange = Math.round(traits.pheromoneRange);
 
   if (dramaticMutation) {
-    const traitKeys: (keyof Traits)[] = ['strength', 'speed', 'perception', 'aggression'];
+    const traitKeys: (keyof Traits)[] = ['strength', 'speed', 'perception', 'aggression', 'pheromoneRange'];
     const key = traitKeys[Math.floor(Math.random() * traitKeys.length)];
-    const maxVals: Record<string, number> = { strength: 10, speed: 3, perception: 5, aggression: 10 };
+    const maxVals: Record<string, number> = { strength: 10, speed: 3, perception: 5, aggression: 10, pheromoneRange: 4 };
     // Push to extreme (high or low)
     traits[key] = Math.random() < 0.5 ? 1 : maxVals[key];
   }
@@ -389,6 +392,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
         hungerThreshold: randomHungerThreshold(),
         tribe,
         birthCooldown: 0,
+        mateCooldown: 0,
         coldExposure: false,
       });
     }
@@ -469,10 +473,10 @@ function detectInteractions(
       }
     }
 
-    // Same-tribe training — only when truly idle (has house, has partner, pantry full, not carrying wood)
+    // Same-tribe training — only when truly idle in village
     if (!fightStarted) {
       const trulyIdle = fightableMales.filter(e => {
-        if (newActionIds.has(e.id) || !e.homeId || !e.partnerId) return false;
+        if (newActionIds.has(e.id)) return false;
         const v = villages.find(vl => vl.tribe === e.tribe);
         return v && Math.abs(e.position.x - v.center.x) + Math.abs(e.position.y - v.center.y) <= v.radius;
       });
@@ -498,62 +502,56 @@ function detectInteractions(
   });
 }
 
-// --- Pairing: unattached male + female in same village form a bond ---
+// --- Pheromone mating: male in range + fertile female → pregnancy chance ---
 
-function detectPairing(entities: Entity[], villages: Village[]): Entity[] {
+function pheromoneMating(entities: Entity[]): Entity[] {
   const updated = [...entities];
-  for (const v of villages) {
-    const inVillage = (e: Entity) =>
-      e.tribe === v.tribe && !e.partnerId
-      && e.state !== 'fighting' && e.state !== 'pregnant'
-      && isReproductive(e);
+  const matedMaleIds = new Set<string>();
 
-    const singles = updated.filter(inVillage);
-    const males = singles.filter(e => e.gender === 'male');
-    const females = singles.filter(e => e.gender === 'female');
+  // Find all fertile males ready to mate
+  const males = updated.filter(e =>
+    e.gender === 'male' && !isChild(e) && isReproductive(e)
+    && e.mateCooldown === 0 && e.state !== 'fighting'
+  );
 
-    for (const male of males) {
-      const female = females.shift();
-      if (!female) break;
-      // Bond them
+  for (const male of males) {
+    if (matedMaleIds.has(male.id)) continue;
+    const range = male.traits.pheromoneRange;
+
+    // Find fertile females in pheromone range
+    for (let fi = 0; fi < updated.length; fi++) {
+      const female = updated[fi];
+      if (female.gender !== 'female' || isChild(female)) continue;
+      if (!isReproductive(female)) continue;
+      if (female.state === 'pregnant') continue;
+      if (female.birthCooldown > 0) continue;
+      if (female.tribe !== male.tribe) continue; // same tribe only
+
+      const dist = manhattan(male.position, female.position);
+      if (dist > range) continue;
+
+      // Pheromone chance
+      if (Math.random() >= PHEROMONE_CHANCE) continue;
+
+      // Impregnate!
+      const pregTime = Math.max(3, Math.round(PREGNANCY_DURATION / female.traits.fertility));
+      updated[fi] = {
+        ...female,
+        state: 'pregnant' as const,
+        stateTimer: pregTime,
+        fatherTraits: male.traits,
+        fatherTribe: male.tribe,
+        goal: undefined,
+      };
+
+      // Male gets cooldown
       const mi = updated.findIndex(e => e.id === male.id);
-      const fi = updated.findIndex(e => e.id === female.id);
-      if (mi >= 0 && fi >= 0) {
-        // Family color = mix of both
-        const familyColor: RGB = [
-          Math.round((male.color[0] + female.color[0]) / 2),
-          Math.round((male.color[1] + female.color[1]) / 2),
-          Math.round((male.color[2] + female.color[2]) / 2),
-        ];
-        updated[mi] = { ...updated[mi], partnerId: female.id, color: familyColor };
-        updated[fi] = { ...updated[fi], partnerId: male.id, color: familyColor };
-      }
+      if (mi >= 0) updated[mi] = { ...updated[mi], mateCooldown: MATE_COOLDOWN };
+      matedMaleIds.add(male.id);
+      break; // one female per male per tick
     }
   }
   return updated;
-}
-
-// --- Night cycle: pairs with house → pregnancy ---
-
-function nightCycle(entities: Entity[]): Entity[] {
-  return entities.map(e => {
-    if (e.gender !== 'female' || e.state !== 'idle' || !e.partnerId || !e.homeId) return e;
-    if (!isReproductive(e)) return e;
-    if (e.birthCooldown > 0) return e; // still recovering from last birth
-    // Find partner
-    const partner = entities.find(o => o.id === e.partnerId);
-    if (!partner || !partner.homeId) return e;
-    // She's in a home with her partner → get pregnant
-    const pregTime = Math.max(3, Math.round(PREGNANCY_DURATION / e.traits.fertility));
-    return {
-      ...e,
-      state: 'pregnant' as const,
-      stateTimer: pregTime,
-      partnerTraits: partner.traits,
-      partnerTribe: partner.tribe,
-      goal: undefined,
-    };
-  });
 }
 
 // --- Main tick ---
@@ -573,7 +571,7 @@ export function tick(state: WorldState): WorldState {
 
   // --- Step 0: Age, energy drain, eat meat if hungry, remove dead ---
   const aged: Entity[] = state.entities.map(e => {
-    const a = { ...e, age: e.age + 1, birthCooldown: Math.max(0, e.birthCooldown - 1) };
+    const a = { ...e, age: e.age + 1, birthCooldown: Math.max(0, e.birthCooldown - 1), mateCooldown: Math.max(0, e.mateCooldown - 1) };
     if (!isChild(a) && a.age % ENERGY_DRAIN_INTERVAL === 0) {
       const baseDrain = 1 + traitEnergyDrain(a.traits);
       // Hungry entities move less → half energy drain
@@ -616,6 +614,25 @@ export function tick(state: WorldState): WorldState {
     }
   }
 
+  // --- Step 0b: Evict grown-up children from mother's house ---
+  // Males never own houses; females get their own when one is free
+  for (let i = 0; i < entities.length; i++) {
+    const e = entities[i];
+    if (!e.homeId || isChild(e)) continue;
+    // Males don't live in houses
+    if (e.gender === 'male') {
+      const house = houses.find(h => h.id === e.homeId);
+      if (house && house.occupantId === e.id) house.occupantId = undefined;
+      entities[i] = { ...e, homeId: undefined };
+      continue;
+    }
+    // Female: only keep homeId if she is the occupant
+    const house = houses.find(h => h.id === e.homeId);
+    if (house && house.occupantId !== e.id) {
+      entities[i] = { ...e, homeId: undefined };
+    }
+  }
+
   // --- Step 1: Resolve completed actions ---
   const grid = createOccupancyGrid(gridSize, entities, houses);
   const babies: Entity[] = [];
@@ -645,7 +662,7 @@ export function tick(state: WorldState): WorldState {
       for (const mother of finishing) {
         resolvedIds.add(mother.id);
 
-        const fatherTraits = mother.partnerTraits ?? mother.traits;
+        const dadTraits = mother.fatherTraits ?? mother.traits;
         const tc = mother.traits.twinChance;
         let babyCount = 1;
         if (Math.random() < tc) {
@@ -656,40 +673,44 @@ export function tick(state: WorldState): WorldState {
         }
 
         const birthHome = homePosition(mother, houses);
-        if (!birthHome) continue;
+        const birthPos = birthHome ? { ...birthHome } : { ...mother.position };
 
         for (let b = 0; b < babyCount; b++) {
-          const birthPos = { ...birthHome };
-
-          const babyTraits = inheritTraits(fatherTraits, mother.traits);
-          babies.push({
+          const babyTraits = inheritTraits(dadTraits, mother.traits);
+          const baby: Entity = {
             id: generateId('e'),
-            position: birthPos,
+            position: { ...birthPos },
             gender: Math.random() < 0.5 ? 'male' : 'female',
             state: 'idle',
             stateTimer: 0,
             age: 0,
             maxAge: randomMaxAge(babyTraits.fertility),
-            color: [...mother.color] as RGB, // born with family color
+            color: [...mother.color] as RGB,
             energy: ENERGY_START,
             traits: babyTraits,
             meat: 0,
             hungerThreshold: randomHungerThreshold(),
             birthCooldown: 0,
-            tribe: (mother.partnerTribe === mother.tribe ? mother.tribe : (Math.random() < 0.5 ? mother.tribe : mother.partnerTribe!)) as TribeId,
-            homeId: mother.homeId,
+            mateCooldown: 0,
+            tribe: (mother.fatherTribe === mother.tribe ? mother.tribe : (Math.random() < 0.5 ? mother.tribe : mother.fatherTribe!)) as TribeId,
+            homeId: birthHome ? mother.homeId : undefined,
             coldExposure: false,
-          });
-          const baby = babies[babies.length - 1];
+          };
+
+          // No home at birth → baby dies
+          if (!birthHome) {
+            log.push({ tick: tickNum, type: 'death', entityId: baby.id, gender: baby.gender, age: 0, cause: 'starvation' });
+            continue;
+          }
 
           // Infant mortality — historical ~30% death rate at birth
           if (Math.random() < INFANT_MORTALITY) {
-            babies.pop(); // remove baby
-            log.push({ tick: tickNum, type: 'death', entityId: baby.id, gender: baby.gender, age: 0, cause: 'starvation' }); // logged as infant death
+            log.push({ tick: tickNum, type: 'death', entityId: baby.id, gender: baby.gender, age: 0, cause: 'starvation' });
           } else {
+            babies.push(baby);
             log.push({ tick: tickNum, type: 'birth', entityId: baby.id, gender: baby.gender, age: 0 });
+            grid[birthPos.y][birthPos.x]++;
           }
-          grid[birthPos.y][birthPos.x]++;
         }
 
         // Maternal mortality
@@ -730,15 +751,13 @@ export function tick(state: WorldState): WorldState {
         if (chopV) chopV.woodStore += WOOD_PER_CHOP;
       }
     } else if (action === 'building') {
-      // Done building → create house (wood already reserved at start)
+      // Done building → create house for village pool
       for (const builder of finishing) {
         resolvedIds.add(builder.id);
-        // Wood was deducted when building started
         const newHouse: House = {
           id: generateId('h'),
           position: { ...builder.position },
           tribe: builder.tribe,
-          ownerId: builder.id,
         };
         houses.push(newHouse);
       }
@@ -782,8 +801,7 @@ export function tick(state: WorldState): WorldState {
         if (e.state === 'chopping') {
           return { ...e, state: 'idle' as const, stateTimer: 0, energy: Math.max(0, energy - 10), meat };
         } else if (e.state === 'building') {
-          const newHome = houses.find(h => h.ownerId === e.id && !e.homeId);
-          return { ...e, state: 'idle' as const, stateTimer: 0, energy: Math.max(0, energy - 10), meat, homeId: newHome?.id };
+          return { ...e, state: 'idle' as const, stateTimer: 0, energy: Math.max(0, energy - 10), meat };
         } else if (e.state === 'training') {
           // Sparring boosts random combat stat slightly
           const boosted = { ...e.traits };
@@ -825,7 +843,7 @@ export function tick(state: WorldState): WorldState {
             if (myVillage && villageNeedsPlants(myVillage, entities)) myVillage.plantStore += surplus;
           }
         } else if (e.state === 'pregnant') {
-          return { ...e, state: 'idle' as const, stateTimer: 0, energy, meat, partnerTraits: undefined, birthCooldown: BIRTH_COOLDOWN };
+          return { ...e, state: 'idle' as const, stateTimer: 0, energy, meat, fatherTraits: undefined, birthCooldown: BIRTH_COOLDOWN };
         }
 
         return { ...e, state: 'idle' as const, stateTimer: 0, energy, meat };
@@ -899,14 +917,20 @@ export function tick(state: WorldState): WorldState {
     }
   }
 
-  // --- Step 2c: Building — male with partner but no house starts building (any state) ---
+  // --- Step 2c: Building — male builds when village needs more houses for homeless females ---
   for (let i = 0; i < entities.length; i++) {
     const e = entities[i];
-    if (e.gender !== 'male' || isChild(e) || e.homeId || !e.partnerId) continue;
-    if (e.state === 'fighting' || e.state === 'pregnant') continue;
+    if (e.gender !== 'male' || isChild(e)) continue;
+    if (e.state !== 'idle') continue;
     const eVillage = updatedVillages.find(v => v.tribe === e.tribe);
     if (!eVillage || !isInVillage(e.position, eVillage)) continue;
     if (eVillage.woodStore < HOUSE_WOOD_COST) continue;
+    // Check if village needs houses: homeless females > free houses
+    const tribeFemales = entities.filter(o => o.tribe === e.tribe && o.gender === 'female' && !isChild(o) && !o.homeId);
+    const freeHouses = houses.filter(h => h.tribe === e.tribe && !h.occupantId);
+    const alreadyBuilding = entities.some(o => o.tribe === e.tribe && o.state === 'building');
+    if (tribeFemales.length <= freeHouses.length && !alreadyBuilding) continue;
+    if (tribeFemales.length === 0) continue;
     const tileOccupied = houses.some(h => h.position.x === e.position.x && h.position.y === e.position.y)
       || entities.some(o => o.id !== e.id && o.state === 'building' && o.position.x === e.position.x && o.position.y === e.position.y);
     if (tileOccupied) continue;
@@ -937,7 +961,7 @@ export function tick(state: WorldState): WorldState {
 
     // Get goal from utility-AI if none
     if (!entity.goal) {
-      const ctx = buildAIContext(entity, updatedVillages, animals, plants, entities, biomes, gridSize, tickNum);
+      const ctx = buildAIContext(entity, updatedVillages, animals, plants, entities, biomes, gridSize, tickNum, houses);
       const action = decideAction(ctx);
       const goal = actionToGoal(action, ctx);
       if (goal) {
@@ -1076,11 +1100,16 @@ export function tick(state: WorldState): WorldState {
   // --- Step 4c: Building (post-movement) ---
   for (let i = 0; i < entities.length; i++) {
     const e = entities[i];
-    if (e.gender !== 'male' || isChild(e) || e.homeId || !e.partnerId) continue;
-    if (e.state === 'fighting' || e.state === 'pregnant') continue;
+    if (e.gender !== 'male' || isChild(e)) continue;
+    if (e.state !== 'idle') continue;
     const postBuildV = updatedVillages.find(v => v.tribe === e.tribe);
     if (!postBuildV || !isInVillage(e.position, postBuildV)) continue;
     if (postBuildV.woodStore < HOUSE_WOOD_COST) continue;
+    const postTribeFemales = entities.filter(o => o.tribe === e.tribe && o.gender === 'female' && !isChild(o) && !o.homeId);
+    const postFreeHouses = houses.filter(h => h.tribe === e.tribe && !h.occupantId);
+    const postAlreadyBuilding = entities.some(o => o.tribe === e.tribe && o.state === 'building');
+    if (postTribeFemales.length <= postFreeHouses.length && !postAlreadyBuilding) continue;
+    if (postTribeFemales.length === 0) continue;
     const postTileOccupied = houses.some(h => h.position.x === e.position.x && h.position.y === e.position.y)
       || entities.some(o => o.id !== e.id && o.state === 'building' && o.position.x === e.position.x && o.position.y === e.position.y);
     if (postTileOccupied) continue;
@@ -1283,49 +1312,30 @@ export function tick(state: WorldState): WorldState {
   // Hard rule: plants can exist only on forest tiles.
   plants = plants.filter(p => biomes[p.position.y]?.[p.position.x] === 'forest');
 
-  // --- Step 7: Pairing (unattached male + female in village → bond) ---
-  entities = detectPairing(entities, updatedVillages);
+  // --- Step 7: Pheromone mating (every tick, not just night) ---
+  entities = pheromoneMating(entities);
 
-  // --- Step 8: Night cycle — paired couples with house → pregnancy ---
-  const isNight = (tickNum % TICKS_PER_DAY) >= DAY_TICKS;
-  if (isNight) {
-    entities = nightCycle(entities);
-  }
-
-  // --- Step 8b: Winter cold — each house reserves 1 wood for the whole winter ---
-  const isWinterStart = month === 9 && (tickNum % ticksPerMonth) === 0;
-  if (isWinterStart) {
-    for (const v of updatedVillages) {
-      const houseCount = houses.filter(h => h.tribe === v.tribe).length;
-      const woodNeeded = houseCount * WINTER_WOOD_COST;
-      if (v.woodStore >= woodNeeded) {
-        v.woodStore -= woodNeeded;
-      } else {
-        v.woodStore = 0;
-        // Not enough wood — entities in this village take cold damage
-        for (let i = 0; i < entities.length; i++) {
-          if (entities[i].tribe === v.tribe) {
-            entities[i] = {
-              ...entities[i],
-              energy: Math.max(0, entities[i].energy - WINTER_COLD_DAMAGE),
-              coldExposure: true,
-            };
-          }
-        }
-      }
+  // --- Step 7b: Homeless females claim free houses ---
+  for (let i = 0; i < entities.length; i++) {
+    const e = entities[i];
+    if (e.gender !== 'female' || isChild(e) || e.homeId) continue;
+    const freeHouse = houses.find(h => h.tribe === e.tribe && !h.occupantId);
+    if (freeHouse) {
+      freeHouse.occupantId = e.id;
+      entities[i] = { ...e, homeId: freeHouse.id };
     }
   }
 
-  // --- Step 8c: When male gets partnered, female gets his homeId ---
-  for (let i = 0; i < entities.length; i++) {
-    const e = entities[i];
-    if (e.partnerId && !e.homeId) {
-      const partner = entities.find(o => o.id === e.partnerId);
-      if (partner?.homeId) {
-        entities[i] = { ...e, homeId: partner.homeId };
-        // Also update house partnerId
-        const house = houses.find(h => h.id === partner.homeId);
-        if (house && !house.partnerId) house.partnerId = e.id;
+  // --- Step 8: Winter — females without house lose energy (cold exposure) ---
+  if (isWinter) {
+    for (let i = 0; i < entities.length; i++) {
+      const e = entities[i];
+      if (e.gender === 'female' && !isChild(e) && !e.homeId) {
+        entities[i] = {
+          ...e,
+          energy: Math.max(0, e.energy - WINTER_COLD_DAMAGE),
+          coldExposure: true,
+        };
       }
     }
   }

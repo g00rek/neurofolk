@@ -84,9 +84,9 @@ export function GridCanvas({ world, size, selectedId, onClick }: GridCanvasProps
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const cellSize = size / world.gridSize;
-    const x = Math.floor((e.clientX - rect.left) / cellSize);
-    const y = Math.floor((e.clientY - rect.top) / cellSize);
+    const scale = size / rect.width;
+    const x = Math.floor((e.clientX - rect.left) * scale / (size / world.gridSize));
+    const y = Math.floor((e.clientY - rect.top) * scale / (size / world.gridSize));
     onClick(x, y);
   };
 
@@ -405,7 +405,7 @@ export function GridCanvas({ world, size, selectedId, onClick }: GridCanvasProps
       ref={canvasRef}
       width={size}
       height={size}
-      style={{ borderRadius: '4px', cursor: 'pointer' }}
+      style={{ borderRadius: '4px', cursor: 'pointer', width: '100%', height: 'auto' }}
       onClick={handleClick}
     />
   );

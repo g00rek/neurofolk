@@ -22,10 +22,12 @@ function makeEntity(overrides: Partial<Entity> = {}): Entity {
       aggression: 3,
       fertility: 1.0,
       twinChance: 0,
+      pheromoneRange: 2,
     },
     meat: 0,
     tribe: 0,
     birthCooldown: 0,
+    mateCooldown: 0,
     ...overrides,
   };
 }
@@ -46,7 +48,7 @@ function makeContext(overrides: Partial<AIContext> = {}): AIContext {
     village,
     inVillage: true,
     isNight: false,
-    hasPartnerInVillage: false,
+    villageNeedsHouses: false,
     tribePopulation: 12,
     animalPopulation: 30,
     ...overrides,
@@ -128,7 +130,7 @@ describe('decideAction hunt behavior', () => {
         entity: makeEntity({
           gender: 'male',
           homeId: undefined,
-          partnerId: undefined,
+          mateCooldown: 0,
         }),
         inVillage: false,
         nearestAnimal: { pos: { x: 7, y: 5 }, dist: 2 },

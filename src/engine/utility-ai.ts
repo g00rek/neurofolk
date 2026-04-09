@@ -1,4 +1,4 @@
-import type { Entity, EntityGoal, Position, Animal, Plant, Village, Biome } from './types';
+import type { Entity, EntityGoal, Position, Animal, Plant, House, Village, Biome } from './types';
 import {
   CHILD_AGE,
   ANIMAL_HUNT_MIN_POPULATION,
@@ -34,7 +34,7 @@ export interface AIContext {
   nearestAnimal?: { pos: Position; dist: number };
   nearestPlant?: { pos: Position; dist: number };
   nearestForest?: { pos: Position; dist: number };
-  hasPartnerInVillage: boolean;
+  villageNeedsHouses: boolean;
   tribePopulation: number;
   animalPopulation: number;
 }
@@ -92,11 +92,9 @@ function scoreSurvival(ctx: AIContext): number {
 function scoreBuildHome(ctx: AIContext): number {
   if (ctx.entity.gender !== 'male') return 0;
   if (ageInYears(ctx.entity) < CHILD_AGE) return 0;
-  if (ctx.entity.homeId) return 0;
-  if (!ctx.entity.partnerId) return 0; // need partner first
-  // Need wood in warehouse
+  if (!ctx.villageNeedsHouses) return 0;
   if (!ctx.village || ctx.village.woodStore < 5) return 0; // not enough wood yet → go chop
-  return 0.9; // high priority — get back to village to build
+  return 0.85;
 }
 
 function scoreChopFirewood(ctx: AIContext): number {
@@ -272,6 +270,7 @@ export function buildAIContext(
   biomes: Biome[][],
   gridSize: number,
   tick: number = 0,
+  houses: House[] = [],
 ): AIContext {
   const village = villages.find(v => v.tribe === entity.tribe);
   const inVillage = !!village && (
@@ -314,10 +313,14 @@ export function buildAIContext(
     }
   }
 
-  // Has partner in village
-  const hasPartnerInVillage = entity.homeId
-    ? entities.some(o => o.id !== entity.id && o.homeId === entity.homeId && o.state === 'idle')
-    : false;
+  // Village needs houses: homeless adult females > free houses
+  const homelessFemales = village
+    ? entities.filter(e => e.tribe === village.tribe && e.gender === 'female' && ageInYears(e) >= CHILD_AGE && !e.homeId).length
+    : 0;
+  const freeHouses = village
+    ? houses.filter(h => h.tribe === village.tribe && !h.occupantId).length
+    : 0;
+  const villageNeedsHouses = homelessFemales > freeHouses;
 
   const isNight = (tick % TICKS_PER_DAY) >= DAY_TICKS;
   const tribePopulation = village
@@ -331,7 +334,7 @@ export function buildAIContext(
     nearestAnimal,
     nearestPlant,
     nearestForest,
-    hasPartnerInVillage,
+    villageNeedsHouses,
     tribePopulation,
     animalPopulation: animals.length,
   };

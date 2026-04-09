@@ -32,8 +32,8 @@ export function Stats({ world }: StatsProps) {
           const m = adults.filter(e => e.gender === 'male').length;
           const f = adults.filter(e => e.gender === 'female').length;
           const kids = members.length - adults.length;
-          const pairs = Math.floor(adults.filter(e => e.partnerId).length / 2);
-          const singles = adults.filter(e => !e.partnerId).length;
+          const housed = adults.filter(e => e.homeId).length;
+          const homeless = adults.length - housed;
           return (
             <div key={v.tribe} style={{ fontSize: '11px', marginBottom: '4px' }}>
               <div>
@@ -45,7 +45,7 @@ export function Stats({ world }: StatsProps) {
                 {kids > 0 && <span style={{ color: '#888' }}> &#128118;{kids}</span>}
               </div>
               <div style={{ color: '#666', fontSize: '10px', marginLeft: '8px' }}>
-                &#128149;{pairs} par · {singles} singli
+                &#127968;{housed} housed · {homeless} homeless
               </div>
             </div>
           );
