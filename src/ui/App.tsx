@@ -90,7 +90,7 @@ export function App() {
     const byChildbirth = deaths.filter(e => e.cause === 'childbirth').length;
 
     const text = [
-      `=== LIFE SIMULATOR — CIVILIZATION LOG ===`,
+      `=== EVOLISO — CIVILIZATION LOG ===`,
       `Extinct at tick ${world.tick} (year ${Math.floor(world.tick / TICKS_PER_YEAR)})`,
       ``,
       `--- SUMMARY ---`,
@@ -153,7 +153,7 @@ export function App() {
   return (
     <div style={containerStyle}>
       <h1 style={{ margin: '0 0 16px', fontSize: '20px', color: '#ccc' }}>
-        Life Simulator
+        Evoliso
       </h1>
       {extinct && (
         <div style={{ background: '#f7768e22', border: '1px solid #f7768e', borderRadius: '4px', padding: '12px 20px', marginBottom: '16px', fontSize: '16px' }}>

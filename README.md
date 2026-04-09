@@ -1,4 +1,4 @@
-# SimLife
+# Evoliso
 
 A grid-based life & evolution simulator. Watch tribal societies hunt, gather, build homes, form families, and survive — or perish.
 
