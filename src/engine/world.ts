@@ -1,17 +1,17 @@
 import type { Entity, Animal, Plant, House, Position, WorldState, RGB, Traits, LogEntry, Biome, Village, TribeId } from './types';
 import {
   MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE, TICKS_PER_YEAR,
-  PREGNANCY_DURATION, BIRTH_COOLDOWN, INFANT_MORTALITY, FIGHTING_DURATION, TICKS_PER_DAY, DAY_TICKS,
+  PREGNANCY_DURATION, BIRTH_COOLDOWN, INFANT_MORTALITY, MATERNAL_MORTALITY, FIGHTING_DURATION, TICKS_PER_DAY, DAY_TICKS,
   ENERGY_MAX, ENERGY_START, ENERGY_DRAIN_INTERVAL, ENERGY_MEAT, ENERGY_PLANT,
-  HUNGER_THRESHOLD, CHILD_AGE, TRAIT_ENERGY_COST,
-  ANIMAL_COUNT, PLANT_COUNT, PLANT_RESPAWN_INTERVAL,
-  PLANT_PORTIONS, FIGHT_MIN_AGE, MEAT_PORTIONS_PER_HUNT,
+  FOOD_RESERVE_MAX, FOOD_RESERVE_MIN, FOOD_RESERVE_PER_PERSON, HUNGER_THRESHOLD, CHILD_AGE, TRAIT_ENERGY_COST, PLANT_RESERVE_MIN,
+  ANIMAL_COUNT, PLANT_COUNT, PLANT_MAX, PLANT_RESPAWN_INTERVAL,
+  PLANT_PORTIONS, PLANT_PORTIONS_PER_GATHER, PLANT_SPRING_FRUIT_CHANCE, FIGHT_MIN_AGE, MEAT_PORTIONS_PER_HUNT,
   CHOPPING_DURATION, BUILDING_DURATION,
-  ANIMAL_REPRO_INTERVAL, ANIMAL_MAX, ANIMAL_FLEE_RANGE, HUNT_KILL_RANGE, FOREST_SPEED_PENALTY, FOREST_PLANT_BONUS, VILLAGE_RADIUS,
+  ANIMAL_REPRO_INTERVAL, ANIMAL_MAX, ANIMAL_HUNT_MIN_POPULATION, ANIMAL_FLEE_RANGE, HUNT_KILL_RANGE, FOREST_SPEED_PENALTY, FOREST_PLANT_BONUS, VILLAGE_RADIUS,
   WOOD_PER_CHOP, HOUSE_WOOD_COST, WINTER_WOOD_COST, WINTER_COLD_DAMAGE,
 } from './types';
-import { generateBiomeGrid, isPassable, isPassableForRonin } from './biomes';
-import { decideAction, buildAIContext } from './utility-ai';
+import { generateBiomeGrid, isPassable } from './biomes';
+import { decideAction, buildAIContext, actionToGoal } from './utility-ai';
 
 interface CreateWorldOptions {
   gridSize: number;
@@ -40,16 +40,74 @@ function isReproductive(e: Entity): boolean {
   return years >= MIN_REPRODUCTIVE_AGE && years <= MAX_REPRODUCTIVE_AGE;
 }
 
+function personalHungerThreshold(e: Entity): number {
+  return e.hungerThreshold ?? HUNGER_THRESHOLD;
+}
+
 function isHungry(e: Entity): boolean {
-  return e.energy < HUNGER_THRESHOLD;
+  return e.energy < personalHungerThreshold(e);
 }
 
 function isChild(e: Entity): boolean {
   return ageInYears(e) < CHILD_AGE;
 }
 
+function homePosition(e: Entity, houses: House[]): Position | undefined {
+  if (!e.homeId) return undefined;
+  return houses.find(h => h.id === e.homeId)?.position;
+}
+
+function isAtHome(e: Entity, houses: House[]): boolean {
+  const home = homePosition(e, houses);
+  return !!home && e.position.x === home.x && e.position.y === home.y;
+}
+
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
+}
+
+function randomHungerThreshold(): number {
+  return HUNGER_THRESHOLD - 8 + Math.floor(Math.random() * 17); // 32..48 around baseline 40
+}
+
+function eatDirectlyToThreshold(entity: Entity, portionEnergy: number, availablePortions: number): { entity: Entity; remainingPortions: number } {
+  let remaining = availablePortions;
+  let energy = entity.energy;
+  const threshold = personalHungerThreshold(entity);
+  while (remaining > 0 && energy < threshold) {
+    energy = Math.min(ENERGY_MAX, energy + portionEnergy);
+    remaining--;
+  }
+  if (energy === entity.energy) return { entity, remainingPortions: remaining };
+  return { entity: { ...entity, energy }, remainingPortions: remaining };
+}
+
+function villageFoodReserveTarget(population: number): number {
+  return Math.min(FOOD_RESERVE_MAX, Math.max(FOOD_RESERVE_MIN, population * FOOD_RESERVE_PER_PERSON));
+}
+
+function villageNeedsFood(village: Village | undefined, entities: Entity[]): boolean {
+  if (!village) return true;
+  const population = entities.filter(e => e.tribe === village.tribe).length;
+  const target = villageFoodReserveTarget(population);
+  return village.meatStore + village.plantStore < target;
+}
+
+function villageNeedsPlants(village: Village | undefined, entities: Entity[]): boolean {
+  return villageNeedsFood(village, entities) || (!!village && village.plantStore < PLANT_RESERVE_MIN);
+}
+
+function canHuntAnimalPopulation(animals: Animal[]): boolean {
+  return animals.length > ANIMAL_HUNT_MIN_POPULATION;
+}
+
+function canGatherPlant(entity: Entity, village: Village | undefined, entities: Entity[]): boolean {
+  if (entity.gender === 'female') return isHungry(entity) || villageNeedsPlants(village, entities);
+  return entity.gender === 'male' && isHungry(entity);
+}
+
+function shouldStoreGatheredPlants(entity: Entity, village: Village | undefined, entities: Entity[]): boolean {
+  return entity.gender === 'female' && !!village && villageNeedsPlants(village, entities);
 }
 
 function randomTraits(): Traits {
@@ -113,11 +171,12 @@ function fightWinner(a: Entity, b: Entity): Entity {
 
 // Color derived from traits: R=strength, G=perception, B=speed
 
-function createOccupancyGrid(gridSize: number, entities: Entity[]): number[][] {
+function createOccupancyGrid(gridSize: number, entities: Entity[], houses: House[] = []): number[][] {
   const grid: number[][] = Array.from({ length: gridSize }, () =>
     new Array(gridSize).fill(0)
   );
   for (const e of entities) {
+    if (isAtHome(e, houses)) continue;
     grid[e.position.y][e.position.x]++;
   }
   return grid;
@@ -205,10 +264,17 @@ function randomPassablePos(biomes: Biome[][], gridSize: number): Position {
   return randomPos(gridSize); // fallback
 }
 
+function randomForestPos(biomes: Biome[][], gridSize: number): Position {
+  for (let i = 0; i < 100; i++) {
+    const p = randomPos(gridSize);
+    if (biomes[p.y][p.x] === 'forest') return p;
+  }
+  return randomPassablePos(biomes, gridSize); // fallback if map has very little forest
+}
+
 function isValidMove(pos: Position, biomes: Biome[][], gridSize: number, tribe?: TribeId, villages?: Village[]): boolean {
   if (pos.x < 0 || pos.x >= gridSize || pos.y < 0 || pos.y >= gridSize) return false;
-  // Ronins can traverse mountains
-  const passable = tribe === -1 ? isPassableForRonin(biomes[pos.y][pos.x]) : isPassable(biomes[pos.y][pos.x]);
+  const passable = isPassable(biomes[pos.y][pos.x]);
   if (!passable) return false;
   if (tribe !== undefined && villages) {
     if (!canEnterTile(pos, tribe, villages)) return false;
@@ -275,8 +341,8 @@ export function createWorld(options: CreateWorldOptions): WorldState {
     radius: VILLAGE_RADIUS,
     color: tribeColors[i],
     name: tribeNames[i],
-    meatStore: 5,
-    plantStore: 10,
+    meatStore: 10,
+    plantStore: 15,
     woodStore: 10, // some firewood to start
   }));
 
@@ -320,8 +386,10 @@ export function createWorld(options: CreateWorldOptions): WorldState {
         energy: ENERGY_START,
         traits,
         meat: 0,
+        hungerThreshold: randomHungerThreshold(),
         tribe,
         birthCooldown: 0,
+        coldExposure: false,
       });
     }
   }
@@ -346,7 +414,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
     // Spawn outside villages
     let pos: Position;
     for (let attempt = 0; ; attempt++) {
-      pos = randomPassablePos(biomes, gridSize);
+      pos = randomForestPos(biomes, gridSize);
       if (!getVillageAt(pos, villages) || attempt > 30) break;
     }
     plants.push({
@@ -367,9 +435,11 @@ function detectInteractions(
   gridSize: number,
   skipIds: Set<string>,
   villages: Village[],
+  houses: House[] = [],
 ): Entity[] {
   const tileGroups = new Map<number, Entity[]>();
   for (const e of entities) {
+    if (isAtHome(e, houses)) continue;
     const key = e.position.y * gridSize + e.position.x;
     const group = tileGroups.get(key) ?? [];
     group.push(e);
@@ -388,7 +458,7 @@ function detectInteractions(
         for (let j = i + 1; j < fightableMales.length && !fightStarted; j++) {
           const m1 = fightableMales[i];
           const m2 = fightableMales[j];
-          if (m1.tribe !== m2.tribe || m1.tribe === -1 || m2.tribe === -1) {
+          if (m1.tribe !== m2.tribe) {
             if (Math.random() < m1.traits.aggression / 10 && Math.random() < m2.traits.aggression / 10) {
               newActionIds.add(m1.id);
               newActionIds.add(m2.id);
@@ -402,9 +472,8 @@ function detectInteractions(
     // Same-tribe training — only when truly idle (has house, has partner, pantry full, not carrying wood)
     if (!fightStarted) {
       const trulyIdle = fightableMales.filter(e => {
-        if (newActionIds.has(e.id) || e.tribe < 0 || !e.homeId || !e.partnerId) return false;
-        // Must be inside own village
-        const v = e.tribe >= 0 ? villages.find(vl => vl.tribe === e.tribe) : undefined;
+        if (newActionIds.has(e.id) || !e.homeId || !e.partnerId) return false;
+        const v = villages.find(vl => vl.tribe === e.tribe);
         return v && Math.abs(e.position.x - v.center.x) + Math.abs(e.position.y - v.center.y) <= v.radius;
       });
       if (trulyIdle.length >= 2 && trulyIdle[0].tribe === trulyIdle[1].tribe) {
@@ -420,10 +489,10 @@ function detectInteractions(
     const group = tileGroups.get(key)!;
     const otherMale = group.find(o => o.id !== e.id && o.gender === 'male' && newActionIds.has(o.id));
     if (e.gender === 'male' && otherMale) {
-      if (e.tribe >= 0 && otherMale.tribe === e.tribe) {
-        return { ...e, state: 'training' as const, stateTimer: 3 };
+      if (otherMale.tribe === e.tribe) {
+        return { ...e, state: 'training' as const, stateTimer: 3, goal: undefined };
       }
-      return { ...e, state: 'fighting' as const, stateTimer: FIGHTING_DURATION };
+      return { ...e, state: 'fighting' as const, stateTimer: FIGHTING_DURATION, goal: undefined };
     }
     return e;
   });
@@ -435,9 +504,9 @@ function detectPairing(entities: Entity[], villages: Village[]): Entity[] {
   const updated = [...entities];
   for (const v of villages) {
     const inVillage = (e: Entity) =>
-      e.tribe === v.tribe && e.state === 'idle' && !e.partnerId
-      && isReproductive(e)
-      && Math.abs(e.position.x - v.center.x) + Math.abs(e.position.y - v.center.y) <= v.radius;
+      e.tribe === v.tribe && !e.partnerId
+      && e.state !== 'fighting' && e.state !== 'pregnant'
+      && isReproductive(e);
 
     const singles = updated.filter(inVillage);
     const males = singles.filter(e => e.gender === 'male');
@@ -466,7 +535,7 @@ function detectPairing(entities: Entity[], villages: Village[]): Entity[] {
 
 // --- Night cycle: pairs with house → pregnancy ---
 
-function nightCycle(entities: Entity[], _houses: House[]): Entity[] {
+function nightCycle(entities: Entity[]): Entity[] {
   return entities.map(e => {
     if (e.gender !== 'female' || e.state !== 'idle' || !e.partnerId || !e.homeId) return e;
     if (!isReproductive(e)) return e;
@@ -482,6 +551,7 @@ function nightCycle(entities: Entity[], _houses: House[]): Entity[] {
       stateTimer: pregTime,
       partnerTraits: partner.traits,
       partnerTribe: partner.tribe,
+      goal: undefined,
     };
   });
 }
@@ -489,15 +559,16 @@ function nightCycle(entities: Entity[], _houses: House[]): Entity[] {
 // --- Main tick ---
 
 export function tick(state: WorldState): WorldState {
-  const { gridSize, biomes, villages } = state;
+  const { gridSize } = state;
+  const biomes = state.biomes.map(row => [...row]);
   const tickNum = state.tick + 1;
-  const updatedVillages = villages.map(v => ({ ...v }));
+  const updatedVillages = state.villages.map(v => ({ ...v, center: { ...v.center }, color: [...v.color] as RGB }));
   function getVillage(tribe: TribeId) {
-    return tribe >= 0 ? updatedVillages[tribe] : undefined;
+    return updatedVillages[tribe];
   }
-  let animals = [...state.animals];
-  let plants = [...state.plants];
-  let houses = [...state.houses];
+  let animals = state.animals.map(a => ({ ...a, position: { ...a.position } }));
+  let plants = state.plants.map(p => ({ ...p, position: { ...p.position } }));
+  const houses = state.houses.map(h => ({ ...h, position: { ...h.position } }));
   const log: LogEntry[] = [];
 
   // --- Step 0: Age, energy drain, eat meat if hungry, remove dead ---
@@ -511,7 +582,7 @@ export function tick(state: WorldState): WorldState {
     }
     // Hungry → eat from village pantry or personal meat (ronin)
     if (isHungry(a) && !isChild(a)) {
-      const myV = a.tribe >= 0 ? villages.find(v => v.tribe === a.tribe) : undefined;
+      const myV = getVillage(a.tribe);
       if (myV && myV.meatStore > 0) {
         myV.meatStore -= 1;
         a.energy = Math.min(ENERGY_MAX, a.energy + ENERGY_MEAT);
@@ -532,14 +603,21 @@ export function tick(state: WorldState): WorldState {
     if (e.age >= e.maxAge) {
       log.push({ tick: tickNum, type: 'death', entityId: e.id, gender: e.gender, age: e.age, cause: 'old_age' });
     } else if (e.energy <= 0) {
-      log.push({ tick: tickNum, type: 'death', entityId: e.id, gender: e.gender, age: e.age, cause: 'starvation' });
+      log.push({
+        tick: tickNum,
+        type: 'death',
+        entityId: e.id,
+        gender: e.gender,
+        age: e.age,
+        cause: e.coldExposure ? 'cold' : 'starvation',
+      });
     } else {
-      entities.push(e);
+      entities.push({ ...e, coldExposure: false });
     }
   }
 
   // --- Step 1: Resolve completed actions ---
-  const grid = createOccupancyGrid(gridSize, entities);
+  const grid = createOccupancyGrid(gridSize, entities, houses);
   const babies: Entity[] = [];
   const resolvedIds = new Set<string>();
   const deadIds = new Set<string>();
@@ -577,13 +655,11 @@ export function tick(state: WorldState): WorldState {
           else babyCount = 4;
         }
 
-        const ns = neighbors(mother.position, gridSize);
+        const birthHome = homePosition(mother, houses);
+        if (!birthHome) continue;
 
         for (let b = 0; b < babyCount; b++) {
-          const free = ns.filter(n => grid[n.y][n.x] < 2);
-          const birthPos = free.length > 0
-            ? free[Math.floor(Math.random() * free.length)]
-            : { ...mother.position };
+          const birthPos = { ...birthHome };
 
           const babyTraits = inheritTraits(fatherTraits, mother.traits);
           babies.push({
@@ -598,9 +674,11 @@ export function tick(state: WorldState): WorldState {
             energy: ENERGY_START,
             traits: babyTraits,
             meat: 0,
+            hungerThreshold: randomHungerThreshold(),
             birthCooldown: 0,
-            tribe: (mother.partnerTribe === mother.tribe ? mother.tribe : -1) as TribeId,
+            tribe: (mother.partnerTribe === mother.tribe ? mother.tribe : (Math.random() < 0.5 ? mother.tribe : mother.partnerTribe!)) as TribeId,
             homeId: mother.homeId,
+            coldExposure: false,
           });
           const baby = babies[babies.length - 1];
 
@@ -612,6 +690,12 @@ export function tick(state: WorldState): WorldState {
             log.push({ tick: tickNum, type: 'birth', entityId: baby.id, gender: baby.gender, age: 0 });
           }
           grid[birthPos.y][birthPos.x]++;
+        }
+
+        // Maternal mortality
+        if (Math.random() < MATERNAL_MORTALITY) {
+          deadIds.add(mother.id);
+          log.push({ tick: tickNum, type: 'death', entityId: mother.id, gender: mother.gender, age: mother.age, cause: 'childbirth' });
         }
       }
     } else if (action === 'training') {
@@ -723,11 +807,10 @@ export function tick(state: WorldState): WorldState {
             consumedAnimalIds.has(a.id)
           );
           if (hadPrey) {
-            if (myVillage) {
-              myVillage.meatStore += MEAT_PORTIONS_PER_HUNT;
-            } else {
-              meat += MEAT_PORTIONS_PER_HUNT; // ronin keeps it
-            }
+            const direct = eatDirectlyToThreshold(e, ENERGY_MEAT, MEAT_PORTIONS_PER_HUNT);
+            energy = direct.entity.energy;
+            const surplus = direct.remainingPortions;
+            if (myVillage) myVillage.meatStore += surplus;
           }
         } else if (e.state === 'gathering') {
           const hadPlant = plants.some(p =>
@@ -736,11 +819,10 @@ export function tick(state: WorldState): WorldState {
             consumedPlantIds.has(p.id)
           );
           if (hadPlant) {
-            if (myVillage) {
-              myVillage.plantStore += 1;
-            } else {
-              energy = Math.min(ENERGY_MAX, energy + ENERGY_PLANT); // ronin eats directly
-            }
+            const direct = eatDirectlyToThreshold(e, ENERGY_PLANT, PLANT_PORTIONS_PER_GATHER);
+            energy = direct.entity.energy;
+            const surplus = direct.remainingPortions;
+            if (myVillage && villageNeedsPlants(myVillage, entities)) myVillage.plantStore += surplus;
           }
         } else if (e.state === 'pregnant') {
           return { ...e, state: 'idle' as const, stateTimer: 0, energy, meat, partnerTraits: undefined, birthCooldown: BIRTH_COOLDOWN };
@@ -754,6 +836,10 @@ export function tick(state: WorldState): WorldState {
       return e;
     });
   entities.push(...babies);
+  entities = entities.map(e => {
+    const home = isChild(e) ? homePosition(e, houses) : undefined;
+    return home ? { ...e, position: { ...home }, state: 'idle' as const, stateTimer: 0 } : e;
+  });
 
   // Remove consumed resources
   animals = animals.filter(a => !consumedAnimalIds.has(a.id));
@@ -762,7 +848,7 @@ export function tick(state: WorldState): WorldState {
   // (Animals move after human movement + hunting detection — see step 5)
 
   // --- Step 2: Detect interactions (pre-movement) ---
-  entities = detectInteractions(entities, gridSize, resolvedIds, updatedVillages);
+  entities = detectInteractions(entities, gridSize, resolvedIds, updatedVillages, houses);
 
   // --- Step 2b: Instant hunting/gathering (on contact) ---
   for (let i = 0; i < entities.length; i++) {
@@ -771,36 +857,36 @@ export function tick(state: WorldState): WorldState {
 
     // Males hunt animals on same tile — instant kill (only if pantry needs it)
     const huntVillage = getVillage(e.tribe);
-    const shouldHunt = e.gender === 'male' && (!huntVillage || huntVillage.meatStore < 50);
+    const huntVillageNeedsFood = villageNeedsFood(huntVillage, entities);
+    const shouldHunt = e.gender === 'male' && canHuntAnimalPopulation(animals) && (isHungry(e) || huntVillageNeedsFood);
     if (shouldHunt) {
       const preyIdx = animals.findIndex(a =>
         Math.abs(a.position.x - e.position.x) + Math.abs(a.position.y - e.position.y) <= HUNT_KILL_RANGE
       );
       if (preyIdx >= 0) {
         animals.splice(preyIdx, 1);
+        const direct = eatDirectlyToThreshold(e, ENERGY_MEAT, MEAT_PORTIONS_PER_HUNT);
+        const surplus = direct.remainingPortions;
+        let updated = direct.entity;
         const myV = getVillage(e.tribe);
-        if (myV) {
-          myV.meatStore += MEAT_PORTIONS_PER_HUNT;
-        } else {
-          entities[i] = { ...e, meat: e.meat + MEAT_PORTIONS_PER_HUNT };
-        }
+        if (myV && huntVillageNeedsFood) myV.meatStore += surplus;
+        else updated = { ...updated, meat: updated.meat + surplus };
+        entities[i] = updated;
         continue;
       }
     }
 
-    // Females gather from plants with portions
-    if (e.gender === 'female') {
+    const gatherVillage = getVillage(e.tribe);
+    if (canGatherPlant(e, gatherVillage, entities)) {
       const plantIdx = plants.findIndex(p =>
         p.portions > 0 && p.position.x === e.position.x && p.position.y === e.position.y
       );
       if (plantIdx >= 0) {
         plants[plantIdx] = { ...plants[plantIdx], portions: plants[plantIdx].portions - 1 };
-        const myV = getVillage(e.tribe);
-        if (myV) {
-          myV.plantStore += 1;
-        } else {
-          entities[i] = { ...e, energy: Math.min(ENERGY_MAX, e.energy + ENERGY_PLANT) };
-        }
+        const direct = eatDirectlyToThreshold(e, ENERGY_PLANT, PLANT_PORTIONS_PER_GATHER);
+        const surplus = direct.remainingPortions;
+        if (shouldStoreGatheredPlants(e, gatherVillage, entities)) gatherVillage!.plantStore += surplus;
+        entities[i] = direct.entity;
         continue;
       }
     }
@@ -808,26 +894,28 @@ export function tick(state: WorldState): WorldState {
     // Male without house, on forest tile → chop tree
     if (e.gender === 'male' && !isChild(e)
         && biomes[e.position.y][e.position.x] === 'forest') {
-      entities[i] = { ...e, state: 'chopping', stateTimer: CHOPPING_DURATION };
-      continue;
-    }
-
-    // Male in village, has partner, no house, warehouse has enough wood → start building
-    const eVillage = e.tribe >= 0 ? updatedVillages.find(v => v.tribe === e.tribe) : undefined;
-    const tileOccupied = houses.some(h => h.position.x === e.position.x && h.position.y === e.position.y)
-      || entities.some(o => o.id !== e.id && o.state === 'building' && o.position.x === e.position.x && o.position.y === e.position.y);
-    if (e.gender === 'male' && !e.homeId && e.partnerId && eVillage
-        && isInVillage(e.position, eVillage)
-        && eVillage.woodStore >= HOUSE_WOOD_COST
-        && !tileOccupied) {
-      eVillage.woodStore -= HOUSE_WOOD_COST; // reserve wood
-      entities[i] = { ...e, state: 'building', stateTimer: BUILDING_DURATION };
+      entities[i] = { ...e, state: 'chopping', stateTimer: CHOPPING_DURATION, goal: undefined };
       continue;
     }
   }
 
+  // --- Step 2c: Building — male with partner but no house starts building (any state) ---
+  for (let i = 0; i < entities.length; i++) {
+    const e = entities[i];
+    if (e.gender !== 'male' || isChild(e) || e.homeId || !e.partnerId) continue;
+    if (e.state === 'fighting' || e.state === 'pregnant') continue;
+    const eVillage = updatedVillages.find(v => v.tribe === e.tribe);
+    if (!eVillage || !isInVillage(e.position, eVillage)) continue;
+    if (eVillage.woodStore < HOUSE_WOOD_COST) continue;
+    const tileOccupied = houses.some(h => h.position.x === e.position.x && h.position.y === e.position.y)
+      || entities.some(o => o.id !== e.id && o.state === 'building' && o.position.x === e.position.x && o.position.y === e.position.y);
+    if (tileOccupied) continue;
+    eVillage.woodStore -= HOUSE_WOOD_COST;
+    entities[i] = { ...e, state: 'building', stateTimer: BUILDING_DURATION, goal: undefined };
+  }
+
   // --- Step 3: Move idle entities ---
-  const moveGrid = createOccupancyGrid(gridSize, entities);
+  const moveGrid = createOccupancyGrid(gridSize, entities, houses);
   const indices = Array.from({ length: entities.length }, (_, i) => i);
   for (let i = indices.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -839,87 +927,99 @@ export function tick(state: WorldState): WorldState {
   for (const idx of indices) {
     let entity = entities[idx];
     if (entity.state !== 'idle' || babyIds.has(entity.id)) continue;
+    if (isChild(entity) && homePosition(entity, houses)) continue;
 
-    const inForest = biomes[entity.position.y][entity.position.x] === 'forest';
-    const speed = Math.max(1, entity.traits.speed - (inForest ? FOREST_SPEED_PENALTY : 0));
+    // Interrupt: critical hunger clears current goal
+    if (entity.energy < 20 && entity.goal) {
+      entity = { ...entity, goal: undefined };
+      entities[idx] = entity;
+    }
 
-    for (let step = 0; step < speed; step++) {
-      if (entity.state !== 'idle') break;
-
-      // Build AI context and decide action
+    // Get goal from utility-AI if none
+    if (!entity.goal) {
       const ctx = buildAIContext(entity, updatedVillages, animals, plants, entities, biomes, gridSize, tickNum);
       const action = decideAction(ctx);
-
-      let target: Position | null = null;
-
-      switch (action.type) {
-        case 'rest':
-          break; // do nothing
-        case 'return_home':
-          if (ctx.village) target = stepToward(entity.position, ctx.village.center, biomes, gridSize, entity.tribe, updatedVillages);
-          break;
-        case 'go_chop':
-          target = stepToward(entity.position, action.target, biomes, gridSize, entity.tribe, updatedVillages);
-          break;
-        case 'go_hunt':
-          target = stepToward(entity.position, action.target, biomes, gridSize, entity.tribe, updatedVillages);
-          break;
-        case 'go_gather':
-          target = stepToward(entity.position, action.target, biomes, gridSize, entity.tribe, updatedVillages);
-          break;
-        case 'leave_village':
-          if (ctx.village) {
-            // Try to walk away from village center; try all 4 dirs, pick one that leads outward
-            const awayDirs = [
-              { x: entity.position.x + 1, y: entity.position.y },
-              { x: entity.position.x - 1, y: entity.position.y },
-              { x: entity.position.x, y: entity.position.y + 1 },
-              { x: entity.position.x, y: entity.position.y - 1 },
-            ].filter(p => isValidMove(p, biomes, gridSize, entity.tribe, updatedVillages));
-            // Prefer direction away from village center
-            const vcx = ctx.village.center.x;
-            const vcy = ctx.village.center.y;
-            awayDirs.sort((a, b) => {
-              const da = Math.abs(a.x - vcx) + Math.abs(a.y - vcy);
-              const db = Math.abs(b.x - vcx) + Math.abs(b.y - vcy);
-              return db - da; // farther from center first
-            });
-            target = awayDirs[0] ?? null;
-          }
-          break;
-        case 'wander':
-          target = randomStepBiome(entity.position, gridSize, biomes);
-          break;
-        case 'play': {
-          // Random step but stay within village
+      const goal = actionToGoal(action, ctx);
+      if (goal) {
+        entity = { ...entity, goal };
+        entities[idx] = entity;
+      } else {
+        // Non-goal action (rest, play, wander) — execute once
+        if (action.type === 'play') {
           const playTarget = randomStepBiome(entity.position, gridSize, biomes);
           const pv = getVillage(entity.tribe);
-          if (pv && isInVillage(playTarget, pv)) target = playTarget;
+          if (pv && isInVillage(playTarget, pv) && moveGrid[playTarget.y][playTarget.x] < 2) {
+            moveGrid[entity.position.y][entity.position.x]--;
+            moveGrid[playTarget.y][playTarget.x]++;
+            entity = { ...entity, position: playTarget };
+            entities[idx] = entity;
+          }
+        } else if (action.type === 'wander') {
+          const wTarget = randomStepBiome(entity.position, gridSize, biomes);
+          if (moveGrid[wTarget.y][wTarget.x] < 2 && canEnterTile(wTarget, entity.tribe, updatedVillages)) {
+            moveGrid[entity.position.y][entity.position.x]--;
+            moveGrid[wTarget.y][wTarget.x]++;
+            entity = { ...entity, position: wTarget };
+            entities[idx] = entity;
+          }
+        }
+        continue; // rest or single-step done
+      }
+    }
+
+    // Pursue goal — move toward target
+    if (entity.goal?.target) {
+      const inForest = biomes[entity.position.y][entity.position.x] === 'forest';
+      const speed = Math.max(1, entity.traits.speed - (inForest ? FOREST_SPEED_PENALTY : 0));
+
+      for (let step = 0; step < speed; step++) {
+        if (entity.state !== 'idle' || !entity.goal?.target) break;
+
+        const moveTarget = stepToward(entity.position, entity.goal.target, biomes, gridSize, entity.tribe, updatedVillages);
+        if (!moveTarget || (moveTarget.x === entity.position.x && moveTarget.y === entity.position.y)) {
+          // Can't move or already there — clear goal
+          entity = { ...entity, goal: undefined };
+          entities[idx] = entity;
           break;
         }
-      }
 
-      if (target && moveGrid[target.y][target.x] < 2 && canEnterTile(target, entity.tribe, villages)) {
-        moveGrid[entity.position.y][entity.position.x]--;
-        moveGrid[target.y][target.x]++;
-        entity = { ...entity, position: target };
-        entities[idx] = entity;
+        if (moveGrid[moveTarget.y][moveTarget.x] < 2 && canEnterTile(moveTarget, entity.tribe, updatedVillages)) {
+          moveGrid[entity.position.y][entity.position.x]--;
+          moveGrid[moveTarget.y][moveTarget.x]++;
+          entity = { ...entity, position: moveTarget };
+          entities[idx] = entity;
 
-        // Inline instant hunt/gather on each step
-        const stepV = getVillage(entity.tribe);
-        if (entity.gender === 'male' && (!stepV || stepV.meatStore < 50)) {
-          const pi = animals.findIndex(a => Math.abs(a.position.x - entity.position.x) + Math.abs(a.position.y - entity.position.y) <= HUNT_KILL_RANGE);
-          if (pi >= 0) {
-            animals.splice(pi, 1);
-            if (stepV) stepV.meatStore += MEAT_PORTIONS_PER_HUNT;
-            else { entity = { ...entity, meat: entity.meat + MEAT_PORTIONS_PER_HUNT }; entities[idx] = entity; }
+          // Arrived at goal target?
+          if (entity.position.x === entity.goal.target.x && entity.position.y === entity.goal.target.y) {
+            entity = { ...entity, goal: undefined };
+            entities[idx] = entity;
+            break;
           }
-        } else if (entity.gender === 'female') {
-          const pi = plants.findIndex(p => p.portions > 0 && p.position.x === entity.position.x && p.position.y === entity.position.y);
-          if (pi >= 0) {
-            plants[pi] = { ...plants[pi], portions: plants[pi].portions - 1 };
-            if (stepV) stepV.plantStore += 1;
-            else { entity = { ...entity, energy: Math.min(ENERGY_MAX, entity.energy + ENERGY_PLANT) }; entities[idx] = entity; }
+
+          // Inline instant hunt/gather on each step
+          const stepV = getVillage(entity.tribe);
+          const stepVillageNeedsFood = villageNeedsFood(stepV, entities);
+          if (entity.gender === 'male' && canHuntAnimalPopulation(animals) && (isHungry(entity) || stepVillageNeedsFood)) {
+            const pi = animals.findIndex(a => Math.abs(a.position.x - entity.position.x) + Math.abs(a.position.y - entity.position.y) <= HUNT_KILL_RANGE);
+            if (pi >= 0) {
+              animals.splice(pi, 1);
+              const direct = eatDirectlyToThreshold(entity, ENERGY_MEAT, MEAT_PORTIONS_PER_HUNT);
+              if (stepV) stepV.meatStore += direct.remainingPortions;
+              entity = { ...entity, ...direct.entity, goal: undefined };
+              entities[idx] = entity;
+              break; // hunt complete, goal done
+            }
+          }
+          if (canGatherPlant(entity, stepV, entities)) {
+            const pi = plants.findIndex(p => p.portions > 0 && p.position.x === entity.position.x && p.position.y === entity.position.y);
+            if (pi >= 0) {
+              plants[pi] = { ...plants[pi], portions: plants[pi].portions - 1 };
+              const direct = eatDirectlyToThreshold(entity, ENERGY_PLANT, PLANT_PORTIONS_PER_GATHER);
+              if (shouldStoreGatheredPlants(entity, stepV, entities)) stepV!.plantStore += direct.remainingPortions;
+              entity = { ...entity, ...direct.entity, goal: undefined };
+              entities[idx] = entity;
+              break; // gather complete, goal done
+            }
           }
         }
       }
@@ -927,7 +1027,7 @@ export function tick(state: WorldState): WorldState {
   }
 
   // --- Step 4: Detect interactions (post-movement) ---
-  entities = detectInteractions(entities, gridSize, resolvedIds, updatedVillages);
+  entities = detectInteractions(entities, gridSize, resolvedIds, updatedVillages, houses);
 
   // --- Step 4b: Instant hunting/gathering (post-movement) ---
   for (let i = 0; i < entities.length; i++) {
@@ -935,49 +1035,57 @@ export function tick(state: WorldState): WorldState {
     if (e.state !== 'idle') continue;
 
     const postHuntV = getVillage(e.tribe);
-    const postShouldHunt = e.gender === 'male' && (!postHuntV || postHuntV.meatStore < 50);
+    const postVillageNeedsFood = villageNeedsFood(postHuntV, entities);
+    const postShouldHunt = e.gender === 'male' && canHuntAnimalPopulation(animals) && (isHungry(e) || postVillageNeedsFood);
     if (postShouldHunt) {
       const preyIdx = animals.findIndex(a =>
         Math.abs(a.position.x - e.position.x) + Math.abs(a.position.y - e.position.y) <= HUNT_KILL_RANGE
       );
       if (preyIdx >= 0) {
         animals.splice(preyIdx, 1);
-        if (postHuntV) postHuntV.meatStore += MEAT_PORTIONS_PER_HUNT;
-        else entities[i] = { ...e, meat: e.meat + MEAT_PORTIONS_PER_HUNT };
+        const direct = eatDirectlyToThreshold(e, ENERGY_MEAT, MEAT_PORTIONS_PER_HUNT);
+        let updated = direct.entity;
+        if (postHuntV && postVillageNeedsFood) postHuntV.meatStore += direct.remainingPortions;
+        else updated = { ...updated, meat: updated.meat + direct.remainingPortions };
+        entities[i] = updated;
         continue;
       }
     }
 
-    if (e.gender === 'female') {
+    const postGatherV = getVillage(e.tribe);
+    if (canGatherPlant(e, postGatherV, entities)) {
       const plantIdx = plants.findIndex(p =>
         p.portions > 0 && p.position.x === e.position.x && p.position.y === e.position.y
       );
       if (plantIdx >= 0) {
         plants[plantIdx] = { ...plants[plantIdx], portions: plants[plantIdx].portions - 1 };
-        const myV = getVillage(e.tribe);
-        if (myV) myV.plantStore += 1;
-        else entities[i] = { ...e, energy: Math.min(ENERGY_MAX, e.energy + ENERGY_PLANT) };
+        const direct = eatDirectlyToThreshold(e, ENERGY_PLANT, PLANT_PORTIONS_PER_GATHER);
+        if (shouldStoreGatheredPlants(e, postGatherV, entities)) postGatherV!.plantStore += direct.remainingPortions;
+        entities[i] = direct.entity;
         continue;
       }
     }
 
     if (e.gender === 'male' && !isChild(e)
         && biomes[e.position.y][e.position.x] === 'forest') {
-      entities[i] = { ...e, state: 'chopping', stateTimer: CHOPPING_DURATION };
+      entities[i] = { ...e, state: 'chopping', stateTimer: CHOPPING_DURATION, goal: undefined };
       continue;
     }
+  }
 
-    const postBuildV = e.tribe >= 0 ? updatedVillages.find(v => v.tribe === e.tribe) : undefined;
+  // --- Step 4c: Building (post-movement) ---
+  for (let i = 0; i < entities.length; i++) {
+    const e = entities[i];
+    if (e.gender !== 'male' || isChild(e) || e.homeId || !e.partnerId) continue;
+    if (e.state === 'fighting' || e.state === 'pregnant') continue;
+    const postBuildV = updatedVillages.find(v => v.tribe === e.tribe);
+    if (!postBuildV || !isInVillage(e.position, postBuildV)) continue;
+    if (postBuildV.woodStore < HOUSE_WOOD_COST) continue;
     const postTileOccupied = houses.some(h => h.position.x === e.position.x && h.position.y === e.position.y)
       || entities.some(o => o.id !== e.id && o.state === 'building' && o.position.x === e.position.x && o.position.y === e.position.y);
-    if (e.gender === 'male' && !e.homeId && e.partnerId && postBuildV
-        && isInVillage(e.position, postBuildV)
-        && postBuildV.woodStore >= HOUSE_WOOD_COST
-        && !postTileOccupied) {
-      postBuildV.woodStore -= HOUSE_WOOD_COST;
-      entities[i] = { ...e, state: 'building', stateTimer: BUILDING_DURATION };
-      continue;
-    }
+    if (postTileOccupied) continue;
+    postBuildV.woodStore -= HOUSE_WOOD_COST;
+    entities[i] = { ...e, state: 'building', stateTimer: BUILDING_DURATION, goal: undefined };
   }
 
   // --- Step 5: Move animals (AFTER humans so hunters can catch them) ---
@@ -1001,11 +1109,48 @@ export function tick(state: WorldState): WorldState {
       newPos = (isValidMove(flee, biomes, gridSize) && !getVillageAt(flee, updatedVillages))
         ? flee : randomStepBiome(a.position, gridSize, biomes);
     } else {
-      newPos = randomStepBiome(a.position, gridSize, biomes);
+      let nearestFood: Plant | undefined;
+      for (const p of plants) {
+        if (p.portions <= 0) continue;
+        const d = manhattan(a.position, p.position);
+        if (d <= 8 && (!nearestFood || d < manhattan(a.position, nearestFood.position))) {
+          nearestFood = p;
+        }
+      }
+      newPos = nearestFood
+        ? stepToward(a.position, nearestFood.position, biomes, gridSize)
+        : randomStepBiome(a.position, gridSize, biomes);
     }
     if (getVillageAt(newPos, updatedVillages)) newPos = a.position;
     return { ...a, position: newPos, reproTimer: Math.max(0, a.reproTimer - 1) };
   });
+
+  // --- Step 5a: Animals eat fruiting plants and reproduce from that food ---
+  const fedBabyAnimals: Animal[] = [];
+  for (let i = 0; i < animals.length; i++) {
+    const a = animals[i];
+    const plantIdx = plants.findIndex(p =>
+      p.portions > 0 && p.position.x === a.position.x && p.position.y === a.position.y
+    );
+    if (plantIdx < 0) continue;
+
+    plants[plantIdx] = { ...plants[plantIdx], portions: plants[plantIdx].portions - 1 };
+    if (a.reproTimer > 0) continue;
+    if (animals.length + fedBabyAnimals.length >= ANIMAL_MAX) continue;
+
+    const spots = neighbors(a.position, gridSize).filter(
+      n => isPassable(biomes[n.y][n.x]) && !getVillageAt(n, updatedVillages)
+    );
+    if (spots.length === 0) continue;
+
+    animals[i] = { ...a, reproTimer: ANIMAL_REPRO_INTERVAL };
+    fedBabyAnimals.push({
+      id: generateId('a'),
+      position: spots[Math.floor(Math.random() * spots.length)],
+      reproTimer: ANIMAL_REPRO_INTERVAL,
+    });
+  }
+  animals.push(...fedBabyAnimals);
 
   // --- Step 5b: Reproduce animals ---
   if (animals.length < ANIMAL_MAX) {
@@ -1039,89 +1184,104 @@ export function tick(state: WorldState): WorldState {
     animals.push(...babyAnimals);
   }
 
-  // --- Step 6: Seasonal plant regrow + respawn ---
-  // Summer = season 1 (months 3-5). First tick of summer = regrow all plants
+  // --- Step 6: Seasonal plant cycle + respawn ---
+  // Autumn: seeded spread from plants that still have fruit.
+  // Winter: no fruit.
+  // Spring: partial fruiting.
+  // Summer: all plants fruit again.
   const ticksPerMonth = TICKS_PER_DAY * 10;
   const month = Math.floor((tickNum % TICKS_PER_YEAR) / ticksPerMonth);
+  const season = Math.floor(month / 3);
+  const isWinter = season === 3;
+  const isAutumn = season === 2;
+  const isAutumnSpreadTick = isAutumn && (tickNum % TICKS_PER_DAY) === 0;
+  const isSpringStart = month === 0 && (tickNum % ticksPerMonth) === 0;
   const isSummerStart = month === 3 && (tickNum % ticksPerMonth) === 0;
 
+  if (isAutumnSpreadTick) {
+    // Autumn propagation (daily): only plants that still have fruit can seed.
+    // New plants start without fruit; they fruit in summer.
+    const basePlants = plants.filter(p => p.portions > 0);
+    const occupied = new Set(plants.map(p => `${p.position.x},${p.position.y}`));
+    for (const parent of basePlants) {
+      if (plants.length >= PLANT_MAX) break;
+      const attempts = Math.floor(Math.random() * 2); // 0..1
+      for (let a = 0; a < attempts && plants.length < PLANT_MAX; a++) {
+        let spawned = false;
+        for (let t = 0; t < 10 && !spawned; t++) {
+          const dx = Math.floor(Math.random() * 7) - 3; // -3..3
+          const dy = Math.floor(Math.random() * 7) - 3; // -3..3
+          const dist = Math.abs(dx) + Math.abs(dy);
+          if (dist < 1 || dist > 3) continue;
+          const nx = parent.position.x + dx;
+          const ny = parent.position.y + dy;
+          if (nx < 0 || nx >= gridSize || ny < 0 || ny >= gridSize) continue;
+          if (biomes[ny][nx] !== 'forest') continue; // plants spread only in forest
+          if (getVillageAt({ x: nx, y: ny }, updatedVillages)) continue;
+          const key = `${nx},${ny}`;
+          if (occupied.has(key)) continue;
+          plants.push({
+            id: generateId('p'),
+            position: { x: nx, y: ny },
+            portions: 0,
+            maxPortions: PLANT_PORTIONS,
+          });
+          occupied.add(key);
+          spawned = true;
+        }
+      }
+    }
+  }
+
+  if (isWinter) {
+    // Winter: plants remain but are not fruiting.
+    plants = plants.map(p => ({ ...p, portions: 0 }));
+  }
+
+  if (isSpringStart) {
+    // Spring: some plants fruit early, giving villages a pre-summer food source.
+    plants = plants.map(p => (
+      Math.random() < PLANT_SPRING_FRUIT_CHANCE ? { ...p, portions: p.maxPortions } : p
+    ));
+  }
+
   if (isSummerStart) {
-    // All plants regrow their portions at start of summer
+    // All plants gain fruit at start of summer.
     plants = plants.map(p => ({ ...p, portions: p.maxPortions }));
   }
 
   // Slow new plant spawns
-  const MAX_PLANTS = 80;
-  if (tickNum % PLANT_RESPAWN_INTERVAL === 0 && plants.length < MAX_PLANTS) {
+  if (tickNum % PLANT_RESPAWN_INTERVAL === 0 && plants.length < PLANT_MAX) {
     for (let attempt = 0; attempt < 20; attempt++) {
-      const pos = randomPassablePos(biomes, gridSize);
+      const pos = randomForestPos(biomes, gridSize);
       if (!getVillageAt(pos, updatedVillages)) {
-        plants.push({ id: generateId('p'), position: pos, portions: PLANT_PORTIONS, maxPortions: PLANT_PORTIONS });
+        plants.push({
+          id: generateId('p'),
+          position: pos,
+          portions: isWinter ? 0 : PLANT_PORTIONS,
+          maxPortions: PLANT_PORTIONS,
+        });
         break;
       }
     }
-    for (let b = 0; b < FOREST_PLANT_BONUS && plants.length < MAX_PLANTS; b++) {
+    for (let b = 0; b < FOREST_PLANT_BONUS && plants.length < PLANT_MAX; b++) {
       for (let attempt = 0; attempt < 20; attempt++) {
         const p = randomPos(gridSize);
         if (biomes[p.y][p.x] === 'forest' && !getVillageAt(p, updatedVillages)) {
-          plants.push({ id: generateId('p'), position: p, portions: PLANT_PORTIONS, maxPortions: PLANT_PORTIONS });
+          plants.push({
+            id: generateId('p'),
+            position: p,
+            portions: isWinter ? 0 : PLANT_PORTIONS,
+            maxPortions: PLANT_PORTIONS,
+          });
           break;
         }
       }
     }
   }
 
-  // --- Step 6: Ronin settlement — 3+ ronins on mountain tile → found new village ---
-  const roninsByTile = new Map<number, Entity[]>();
-  for (const e of entities) {
-    if (e.tribe !== -1) continue;
-    const key = e.position.y * gridSize + e.position.x;
-    const group = roninsByTile.get(key) ?? [];
-    group.push(e);
-    roninsByTile.set(key, group);
-  }
-
-  for (const [key, group] of roninsByTile) {
-    if (group.length < 3) continue;
-    const x = key % gridSize;
-    const y = Math.floor(key / gridSize);
-    if (biomes[y][x] !== 'mountain') continue;
-    // Already a village here?
-    if (getVillageAt({ x, y }, updatedVillages)) continue;
-
-    // Found new tribe!
-    const newTribeId = updatedVillages.length;
-    const r = 50 + Math.floor(Math.random() * 150);
-    const g = 50 + Math.floor(Math.random() * 150);
-    const b = 50 + Math.floor(Math.random() * 150);
-    updatedVillages.push({
-      tribe: newTribeId,
-      center: { x, y },
-      radius: 3, // small settlement
-      color: [r, g, b] as RGB,
-      name: `Tribe ${newTribeId}`,
-      meatStore: 0,
-      plantStore: 0,
-      woodStore: 0,
-    });
-    // Clear mountain around settlement center for passability
-    for (let dy = -3; dy <= 3; dy++) {
-      for (let dx = -3; dx <= 3; dx++) {
-        if (Math.abs(dx) + Math.abs(dy) <= 3) {
-          const nx = x + dx;
-          const ny = y + dy;
-          if (nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize) {
-            if (biomes[ny][nx] === 'mountain') biomes[ny][nx] = 'plains';
-          }
-        }
-      }
-    }
-    // Assign ronins to new tribe
-    for (const e of group) {
-      const idx = entities.indexOf(e);
-      if (idx >= 0) entities[idx] = { ...entities[idx], tribe: newTribeId };
-    }
-  }
+  // Hard rule: plants can exist only on forest tiles.
+  plants = plants.filter(p => biomes[p.position.y]?.[p.position.x] === 'forest');
 
   // --- Step 7: Pairing (unattached male + female in village → bond) ---
   entities = detectPairing(entities, updatedVillages);
@@ -1129,14 +1289,12 @@ export function tick(state: WorldState): WorldState {
   // --- Step 8: Night cycle — paired couples with house → pregnancy ---
   const isNight = (tickNum % TICKS_PER_DAY) >= DAY_TICKS;
   if (isNight) {
-    entities = nightCycle(entities, houses);
+    entities = nightCycle(entities);
   }
 
-  // --- Step 8b: Winter cold — houses consume wood, entities without heating take damage ---
-  const season = Math.floor(month / 3);
-  const isWinter = season === 3;
-  if (isWinter && tickNum % TICKS_PER_DAY === 0) {
-    // Once per day in winter: each house burns 1 wood
+  // --- Step 8b: Winter cold — each house reserves 1 wood for the whole winter ---
+  const isWinterStart = month === 9 && (tickNum % ticksPerMonth) === 0;
+  if (isWinterStart) {
     for (const v of updatedVillages) {
       const houseCount = houses.filter(h => h.tribe === v.tribe).length;
       const woodNeeded = houseCount * WINTER_WOOD_COST;
@@ -1147,7 +1305,11 @@ export function tick(state: WorldState): WorldState {
         // Not enough wood — entities in this village take cold damage
         for (let i = 0; i < entities.length; i++) {
           if (entities[i].tribe === v.tribe) {
-            entities[i] = { ...entities[i], energy: Math.max(0, entities[i].energy - WINTER_COLD_DAMAGE) };
+            entities[i] = {
+              ...entities[i],
+              energy: Math.max(0, entities[i].energy - WINTER_COLD_DAMAGE),
+              coldExposure: true,
+            };
           }
         }
       }

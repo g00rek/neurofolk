@@ -6,7 +6,13 @@ interface ControlsProps {
   onReset: () => void;
 }
 
+const MIN_SPEED_MS = 0.1;
+const MAX_SPEED_MS = 300;
+
 export function Controls({ running, speed, onToggle, onSpeedChange, onReset }: ControlsProps) {
+  const sliderValue = MAX_SPEED_MS + MIN_SPEED_MS - speed;
+  const speedLabel = speed < 1 ? speed.toFixed(1) : Math.round(speed).toString();
+
   return (
     <div style={panelStyle}>
       <div style={labelStyle}>Controls</div>
@@ -18,15 +24,15 @@ export function Controls({ running, speed, onToggle, onSpeedChange, onReset }: C
       </div>
       <div style={{ marginTop: '12px' }}>
         <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>
-          Speed: {speed}ms
+          Speed: {speedLabel}ms
         </div>
         <input
           type="range"
-          min={1}
-          max={200}
-          step={1}
-          value={201 - speed}
-          onChange={e => onSpeedChange(201 - Number(e.target.value))}
+          min={MIN_SPEED_MS}
+          max={MAX_SPEED_MS}
+          step={MIN_SPEED_MS}
+          value={sliderValue}
+          onChange={e => onSpeedChange(+(MAX_SPEED_MS + MIN_SPEED_MS - Number(e.target.value)).toFixed(1))}
           style={{ width: '100%' }}
         />
       </div>

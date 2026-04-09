@@ -1,57 +1,76 @@
-import { useState, useEffect, useCallback } from 'react';
-import { createWorld, tick } from '../engine/world';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { createWorld } from '../engine/world';
 import { GridCanvas } from './GridCanvas';
 import { Stats } from './Stats';
 import { Controls } from './Controls';
 import { EntityPanel } from './EntityPanel';
 import { PopGraph } from './PopGraph';
 import { TraitAverages } from './TraitAverages';
+import { EventLog } from './EventLog';
 import type { WorldState } from '../engine/types';
 import { TICKS_PER_YEAR } from '../engine/types';
 
-const CANVAS_SIZE = 900;
-const POP_SAMPLE_INTERVAL = 5; // sample population every N ticks
+const CANVAS_SIZE = 760;
+const WORLD_GRID_SIZE = 40;
+const INITIAL_ENTITY_COUNT = 12;
+const VILLAGE_COUNT = 2;
+const INITIAL_SPEED = 300;
+
+interface HistoryPoint {
+  pop: number[];       // population per tribe [0,1,2]
+}
+
+type WorkerResponse =
+  | { type: 'snapshot'; world: WorldState; samples: HistoryPoint[]; running: boolean };
 
 export function App() {
-  const [world, setWorld] = useState<WorldState>(() =>
-    createWorld({ gridSize: 50, entityCount: 12, villageCount: 2 })
-  );
-  const [running, setRunning] = useState(false);
-  const [speed, setSpeed] = useState(300);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  interface HistoryPoint {
-    pop: number[];       // population per tribe [0,1,2,ronin]
+  const initialWorldRef = useRef<WorldState | null>(null);
+  const workerRef = useRef<Worker | null>(null);
+  if (!initialWorldRef.current) {
+    initialWorldRef.current = createWorld({
+      gridSize: WORLD_GRID_SIZE,
+      entityCount: INITIAL_ENTITY_COUNT,
+      villageCount: VILLAGE_COUNT,
+    });
   }
+
+  const [world, setWorld] = useState<WorldState>(() => initialWorldRef.current as WorldState);
+  const [running, setRunning] = useState(false);
+  const [speed, setSpeed] = useState(INITIAL_SPEED);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
 
   const extinct = world.entities.length === 0 && world.tick > 0;
 
-  // At very high speed, run multiple ticks per frame
-  const ticksPerFrame = speed <= 2 ? 50 : speed <= 5 ? 20 : speed <= 10 ? 10 : speed <= 20 ? 5 : 1;
-
-  const step = useCallback(() => {
-    setWorld(prev => {
-      let state = prev;
-      for (let i = 0; i < ticksPerFrame; i++) {
-        if (state.entities.length === 0) return state;
-        state = tick(state);
-        if (state.tick % POP_SAMPLE_INTERVAL === 0) {
-          setHistory(h => {
-            const pop = [0, 1, 2, -1].map(t => state.entities.filter(e => e.tribe === t).length);
-            const updated = [...h, { pop }];
-            return updated.length > 200 ? updated.slice(-200) : updated;
-          });
-        }
+  useEffect(() => {
+    const worker = new Worker(new URL('../engine/simulationWorker.ts', import.meta.url), { type: 'module' });
+    workerRef.current = worker;
+    worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+      if (event.data.type !== 'snapshot') return;
+      setWorld(event.data.world);
+      if (!event.data.running) setRunning(false);
+      if (event.data.samples.length > 0) {
+        setHistory(h => {
+          const updated = [...h, ...event.data.samples];
+          return updated.length > 200 ? updated.slice(-200) : updated;
+        });
       }
-      return state;
-    });
-  }, [ticksPerFrame]);
+    };
+    worker.postMessage({ type: 'setWorld', world: initialWorldRef.current, speed: INITIAL_SPEED });
+
+    return () => {
+      worker.terminate();
+      workerRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
-    if (!running || extinct) return;
-    const interval = setInterval(step, speed);
-    return () => clearInterval(interval);
-  }, [running, speed, step, extinct]);
+    workerRef.current?.postMessage({ type: running && !extinct ? 'start' : 'stop' });
+  }, [running, extinct]);
+
+  useEffect(() => {
+    workerRef.current?.postMessage({ type: 'setSpeed', speed });
+  }, [speed]);
 
   const selectedEntity = selectedId
     ? world.entities.find(e => e.id === selectedId) ?? null
@@ -66,7 +85,9 @@ export function App() {
     const births = log.filter(e => e.type === 'birth');
     const byOldAge = deaths.filter(e => e.cause === 'old_age').length;
     const byStarvation = deaths.filter(e => e.cause === 'starvation').length;
+    const byCold = deaths.filter(e => e.cause === 'cold').length;
     const byFight = deaths.filter(e => e.cause === 'fight').length;
+    const byChildbirth = deaths.filter(e => e.cause === 'childbirth').length;
 
     const text = [
       `=== LIFE SIMULATOR — CIVILIZATION LOG ===`,
@@ -77,7 +98,9 @@ export function App() {
       `Deaths: ${deaths.length}`,
       `  Old age: ${byOldAge}`,
       `  Starvation: ${byStarvation}`,
+      `  Cold: ${byCold}`,
       `  Fight: ${byFight}`,
+      `  Childbirth: ${byChildbirth}`,
       ``,
       `--- WORLD STATE AT EXTINCTION ---`,
       `Animals remaining: ${world.animals.length}`,
@@ -94,7 +117,7 @@ export function App() {
     ].join('\n');
 
     fetch('/api/save-log', { method: 'POST', body: text }).catch(() => {});
-  }, [extinct]);
+  }, [extinct, world]);
 
   // Clear selection if entity died
   useEffect(() => {
@@ -105,17 +128,27 @@ export function App() {
 
   const handleCanvasClick = useCallback((x: number, y: number) => {
     const entity = world.entities.find(
-      e => e.position.x === x && e.position.y === y
+      e => {
+        const home = e.homeId ? world.houses.find(house => house.id === e.homeId) : undefined;
+        const atHome = home && e.position.x === home.position.x && e.position.y === home.position.y;
+        return !atHome && e.position.x === x && e.position.y === y;
+      }
     );
     setSelectedId(entity ? entity.id : null);
   }, [world]);
 
   const handleReset = useCallback(() => {
-    setWorld(createWorld({ gridSize: 50, entityCount: 12, villageCount: 2 }));
+    const nextWorld = createWorld({
+      gridSize: WORLD_GRID_SIZE,
+      entityCount: INITIAL_ENTITY_COUNT,
+      villageCount: VILLAGE_COUNT,
+    });
+    setWorld(nextWorld);
     setRunning(false);
     setSelectedId(null);
     setHistory([]);
-  }, []);
+    workerRef.current?.postMessage({ type: 'reset', world: nextWorld, speed });
+  }, [speed]);
 
   return (
     <div style={containerStyle}>
@@ -140,9 +173,8 @@ export function App() {
               <div style={labelStyle}>Population</div>
               <PopGraph series={[
                 { data: history.map(h => h.pop[0]), color: '#dc3c3c', label: 'Red' },
-                { data: history.map(h => h.pop[1]), color: '#3cb43c', label: 'Grn' },
-                { data: history.map(h => h.pop[2]), color: '#3c64dc', label: 'Blu' },
-                { data: history.map(h => h.pop[3]), color: '#b48c3c', label: 'Ron' },
+                { data: history.map(h => h.pop[1]), color: '#3c64dc', label: 'Blu' },
+                { data: history.map(h => h.pop[2]), color: '#3cb43c', label: 'Grn' },
               ]} width={290} height={80} />
             </div>
             <div style={graphPanelStyle}>
@@ -172,15 +204,16 @@ export function App() {
                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginTop: '2px' }}>
                       <span style={{ fontSize: '9px', color: '#a08050', width: '12px' }}>&#129717;</span>
                       <div style={{ flex: 1, height: '6px', background: '#333', borderRadius: '3px' }}>
-                        <div style={{ width: `${Math.min(100, Math.round(((v as any).woodStore / 30) * 100))}%`, height: '100%', background: '#a08050', borderRadius: '3px' }} />
+                        <div style={{ width: `${Math.min(100, Math.round((v.woodStore / 30) * 100))}%`, height: '100%', background: '#a08050', borderRadius: '3px' }} />
                       </div>
-                      <span style={{ fontSize: '9px', color: '#666', width: '20px' }}>{(v as any).woodStore}</span>
+                      <span style={{ fontSize: '9px', color: '#666', width: '20px' }}>{v.woodStore}</span>
                     </div>
                   </div>
                 );
               })}
             </div>
           </div>
+          <EventLog log={world.log} />
         </div>
         <div style={sidebarStyle}>
           <Controls

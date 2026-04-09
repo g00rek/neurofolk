@@ -88,8 +88,8 @@ export function EntityPanel({ entity, world, onClose }: EntityPanelProps) {
       </div>
       <div style={rowStyle}>
         <span style={dimStyle}>Tribe:</span>
-        <span style={{ color: entity.tribe === -1 ? '#ff9e64' : '#ccc' }}>
-          {entity.tribe === -1 ? '⚠ Ronin' : (['Red', 'Green', 'Blue'][entity.tribe] ?? `Tribe ${entity.tribe}`)}
+        <span style={{ color: '#ccc' }}>
+          {['Red', 'Blue', 'Green'][entity.tribe] ?? `Tribe ${entity.tribe}`}
         </span>
       </div>
       <div style={rowStyle}>
@@ -144,14 +144,17 @@ function stateLabel(entity: Entity): string {
     case 'idle': {
       const years = ageInYears(entity);
       if (years < CHILD_AGE) return '👶 Child';
-      if (entity.energy < HUNGER_THRESHOLD) {
-        return entity.gender === 'male' ? '🔍 Seeking prey' : '🔍 Seeking plants';
+      if (entity.goal) {
+        const goalLabels: Record<string, string> = {
+          hunt: '🏹 Hunting',
+          gather: '🌿 Gathering',
+          chop: '🪓 Going to chop',
+          return_home: '🏠 Returning',
+          build: '🔨 Going to build',
+        };
+        return goalLabels[entity.goal.type] ?? '🚶 Moving';
       }
-      if (years >= MIN_REPRODUCTIVE_AGE && years <= MAX_REPRODUCTIVE_AGE && entity.energy >= ENERGY_MATING_MIN) {
-        if (entity.gender === 'male' && entity.meat > 0) return '💑 Seeking mate';
-        if (entity.gender === 'female') return '💑 Seeking mate';
-      }
-      return '🚶 Strolling';
+      return '🚶 Idle';
     }
     default: return entity.state;
   }

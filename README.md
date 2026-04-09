@@ -20,7 +20,7 @@ No player input — just watch, click entities for details, and adjust speed.
 ## Features
 
 ### World
-- 30x30 procedural map with biomes: plains, forest, mountain, water
+- 50x50 procedural map with biomes: plains, forest, mountain, water
 - Day/night cycle (10 ticks day + 10 ticks night)
 - Seasonal plant regrow (bushes fruit in summer)
 - Animals roam, reproduce, and flee from hunters
@@ -102,7 +102,7 @@ When civilization goes extinct, a log file is saved to `logs/civ-{timestamp}.txt
 
 ## Tech Stack
 
-- Vite + React 18 + TypeScript
+- Vite + React 19 + TypeScript
 - HTML Canvas 2D rendering
 - Utility AI for entity behavior
 - Procedural biome generation

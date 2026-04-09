@@ -18,7 +18,7 @@ export interface Traits {
   twinChance: number;   // 0-1: chance of multiple births (0=always single, 1=always multiples)
 }
 
-export type TribeId = number; // -1 = ronin, 0/1/2 = starting tribes, 3+ = ronin settlements
+export type TribeId = number; // 0/1/2 = starting tribes
 
 export interface Village {
   tribe: TribeId;
@@ -35,11 +35,16 @@ export interface Village {
 
 export const WOOD_PER_CHOP = 3;           // wood portions from chopping 1 forest tile
 export const HOUSE_WOOD_COST = 5;         // wood needed from warehouse to build a house
-export const WINTER_WOOD_COST = 1;        // wood consumed per house per day in winter
-export const WINTER_COLD_DAMAGE = 5;      // energy lost per tick without heating in winter
+export const WINTER_WOOD_COST = 1;        // wood reserved per house for the whole winter
+export const WINTER_COLD_DAMAGE = 2;      // energy lost per tick without heating in winter
 
 // No food requirement for mating — they just need energy
 export const VILLAGE_OPTIMAL_POP = 12; // above this, mating energy cost rises
+
+export interface EntityGoal {
+  type: 'hunt' | 'gather' | 'chop' | 'return_home' | 'build';
+  target?: Position;
+}
 
 export interface Entity {
   id: string;
@@ -53,15 +58,18 @@ export interface Entity {
   energy: number;
   traits: Traits;
   meat: number;
+  hungerThreshold?: number; // personal hunger threshold for direct eating decisions
   tribe: TribeId;
   homeId?: string;
   partnerId?: string;    // bonded partner
   birthCooldown: number; // ticks until next pregnancy allowed (0 = ready)
   partnerTraits?: Traits; // stored father's traits during pregnancy
   partnerTribe?: TribeId;
+  coldExposure?: boolean; // set when winter cold penalty was applied this tick
+  goal?: EntityGoal;
 }
 
-export const MEAT_PORTIONS_PER_HUNT = 8;
+export const MEAT_PORTIONS_PER_HUNT = 60;
 
 // Traits
 export const TRAIT_ENERGY_COST = 0.15; // extra energy drain per total trait points above baseline
@@ -72,11 +80,12 @@ export interface Animal {
   reproTimer: number; // ticks until next reproduction attempt
 }
 
-export const ANIMAL_REPRO_INTERVAL = 1200; // ~6 months between reproduction
+export const ANIMAL_REPRO_INTERVAL = 2400; // 1 year between reproduction per animal
 export const ANIMAL_REPRO_RANGE = 2;     // max animals on nearby tiles to reproduce
-export const ANIMAL_MAX = 40;            // carrying capacity
+export const ANIMAL_MAX = 80;            // population cap after increasing meat yield
+export const ANIMAL_HUNT_MIN_POPULATION = 12; // preserve a breeding population
 export const ANIMAL_FLEE_RANGE = 1;      // animals flee humans within this range
-export const HUNT_KILL_RANGE = 2;       // bow range — instant kill within this distance
+export const HUNT_KILL_RANGE = 3;       // bow range — instant kill within this distance
 
 export interface Plant {
   id: string;
@@ -86,7 +95,9 @@ export interface Plant {
 }
 
 export const PLANT_PORTIONS = 5;          // portions per bush
+export const PLANT_PORTIONS_PER_GATHER = 10; // portions moved to pantry per successful gather
 export const PLANT_SEASON_REGROW = true;  // regrow in summer
+export const PLANT_SPRING_FRUIT_CHANCE = 0.4;
 
 export const FOREST_REGROW_TIME = 7200; // ~3 years for chopped forest to regrow
 export const FIGHT_MIN_AGE = 16;
@@ -121,17 +132,25 @@ export const GATHERING_DURATION = 0; // instant on contact
 // Energy
 export const ENERGY_MAX = 100;
 export const ENERGY_START = 80;
-export const ENERGY_DRAIN_INTERVAL = 10; // lose 1 energy every half day (200 ticks)
-export const ENERGY_MEAT = 15;
-export const ENERGY_PLANT = 10;
+export const ENERGY_DRAIN_INTERVAL = 15; // lose energy less often to reduce food pressure
+export const ENERGY_MEAT = 25;
+export const ENERGY_PLANT = 18;
 export const ENERGY_MATING_MIN = 30;
 export const HUNGER_THRESHOLD = 40; // eat from pantry when truly hungry
 export const CHILD_AGE = 3; // children don't work/fight/lose energy (years)
 export const INFANT_MORTALITY = 0.3; // 30% chance child dies at birth (historical rate)
+export const MATERNAL_MORTALITY = 0.05; // 5% chance mother dies per birth
+
+export const FOOD_RESERVE_PER_PERSON = 4;
+export const FOOD_RESERVE_MIN = 30;
+export const FOOD_RESERVE_MAX = 120;
+export const PLANT_RESERVE_MIN = 20;
+export const PLANT_DETECTION_MULTIPLIER = 3;
 
 // Resources
-export const ANIMAL_COUNT = 7;
+export const ANIMAL_COUNT = 30;
 export const PLANT_COUNT = 30;
+export const PLANT_MAX = 300;
 export const PLANT_RESPAWN_INTERVAL = 100; // new plant every ~5 days
 
 // Biomes
@@ -142,7 +161,7 @@ export interface BiomeGrid {
   gridSize: number;
 }
 
-export type DeathCause = 'old_age' | 'starvation' | 'fight';
+export type DeathCause = 'old_age' | 'starvation' | 'fight' | 'cold' | 'childbirth';
 
 export interface LogEntry {
   tick: number;

@@ -60,4 +60,5 @@ console.log(`Deaths: ${world.log.filter(l => l.type === 'death').length}`);
 const deaths = world.log.filter(l => l.type === 'death');
 console.log(`  Old age: ${deaths.filter(d => d.cause === 'old_age').length}`);
 console.log(`  Starvation: ${deaths.filter(d => d.cause === 'starvation').length}`);
+console.log(`  Cold: ${deaths.filter(d => d.cause === 'cold').length}`);
 console.log(`  Fight: ${deaths.filter(d => d.cause === 'fight').length}`);

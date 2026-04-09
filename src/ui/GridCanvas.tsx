@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import type { WorldState, Entity } from '../engine/types';
+import type { WorldState, Entity, Village } from '../engine/types';
 import { CHILD_AGE } from '../engine/types';
 import { ageInYears } from '../engine/world';
 
@@ -20,11 +20,19 @@ const TRIBE_COLORS: Record<number, [number, number, number]> = {
   [-1]: [180, 140, 60], // Ronin
 };
 
-function entityColor(entity: Entity, villages: { tribe: number; color: [number, number, number] }[]): string {
+function entityColor(entity: Entity, villages: Village[]): string {
   const base = TRIBE_COLORS[entity.tribe]
     ?? villages.find(v => v.tribe === entity.tribe)?.color
     ?? [150, 150, 150];
   return `rgb(${base[0]},${base[1]},${base[2]})`;
+}
+
+function isEntityAtHome(entity: Entity, world: WorldState): boolean {
+  if (!entity.homeId) return false;
+  const home = world.houses.find(house => house.id === entity.homeId);
+  return !!home
+    && entity.position.x === home.position.x
+    && entity.position.y === home.position.y;
 }
 
 function drawPerson(
@@ -70,6 +78,7 @@ function drawPerson(
 
 export function GridCanvas({ world, size, selectedId, onClick }: GridCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const backgroundCacheRef = useRef<{ key: string; canvas: HTMLCanvasElement } | null>(null);
 
   const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -89,66 +98,80 @@ export function GridCanvas({ world, size, selectedId, onClick }: GridCanvasProps
     if (!ctx) return;
 
     const cellSize = size / world.gridSize;
+    const backgroundKey = [
+      size,
+      world.gridSize,
+      world.biomes.map(row => row.join('')).join(''),
+      world.villages.map(v => `${v.tribe}:${v.center.x},${v.center.y},${v.radius}:${v.color.join(',')}`).join('|'),
+    ].join('|');
 
-    // Background — biome colors
-    const biomeColors: Record<string, string> = {
-      plains: '#2a2a1e',
-      forest: '#1a2e1a',
-      mountain: '#3a3a3a',
-      water: '#1a2a3e',
-    };
+    if (backgroundCacheRef.current?.key !== backgroundKey) {
+      const background = document.createElement('canvas');
+      background.width = size;
+      background.height = size;
+      const bg = background.getContext('2d');
+      if (!bg) return;
 
-    for (let y = 0; y < world.gridSize; y++) {
-      for (let x = 0; x < world.gridSize; x++) {
-        const biome = world.biomes[y][x];
-        ctx.fillStyle = biomeColors[biome] || GRID_BG;
-        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-      }
-    }
+      const biomeColors: Record<string, string> = {
+        plains: '#2a2a1e',
+        forest: '#1a2e1a',
+        mountain: '#3a3a3a',
+        water: '#1a2a3e',
+      };
 
-    // Grid lines
-    if (cellSize >= 4) {
-      ctx.beginPath();
-      ctx.strokeStyle = GRID_LINE;
-      ctx.lineWidth = 0.3;
-      for (let i = 0; i <= world.gridSize; i++) {
-        const pos = i * cellSize;
-        ctx.moveTo(pos, 0);
-        ctx.lineTo(pos, size);
-        ctx.moveTo(0, pos);
-        ctx.lineTo(size, pos);
-      }
-      ctx.stroke();
-    }
-
-    // --- Draw village borders (palisade) ---
-    for (const village of world.villages) {
-      const [r, g, b] = village.color;
-      ctx.strokeStyle = `rgba(${r},${g},${b},0.5)`;
-      ctx.lineWidth = 2;
-      // Draw border around village area
       for (let y = 0; y < world.gridSize; y++) {
         for (let x = 0; x < world.gridSize; x++) {
-          const inside = Math.abs(x - village.center.x) + Math.abs(y - village.center.y) <= village.radius;
-          if (!inside) continue;
-          const px = x * cellSize;
-          const py = y * cellSize;
-          // Check each edge — draw border if neighbor is outside
-          if (Math.abs((x - 1) - village.center.x) + Math.abs(y - village.center.y) > village.radius) {
-            ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, py + cellSize); ctx.stroke();
-          }
-          if (Math.abs((x + 1) - village.center.x) + Math.abs(y - village.center.y) > village.radius) {
-            ctx.beginPath(); ctx.moveTo(px + cellSize, py); ctx.lineTo(px + cellSize, py + cellSize); ctx.stroke();
-          }
-          if (Math.abs(x - village.center.x) + Math.abs((y - 1) - village.center.y) > village.radius) {
-            ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + cellSize, py); ctx.stroke();
-          }
-          if (Math.abs(x - village.center.x) + Math.abs((y + 1) - village.center.y) > village.radius) {
-            ctx.beginPath(); ctx.moveTo(px, py + cellSize); ctx.lineTo(px + cellSize, py + cellSize); ctx.stroke();
+          const biome = world.biomes[y][x];
+          bg.fillStyle = biomeColors[biome] || GRID_BG;
+          bg.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+        }
+      }
+
+      if (cellSize >= 4) {
+        bg.beginPath();
+        bg.strokeStyle = GRID_LINE;
+        bg.lineWidth = 0.3;
+        for (let i = 0; i <= world.gridSize; i++) {
+          const pos = i * cellSize;
+          bg.moveTo(pos, 0);
+          bg.lineTo(pos, size);
+          bg.moveTo(0, pos);
+          bg.lineTo(size, pos);
+        }
+        bg.stroke();
+      }
+
+      for (const village of world.villages) {
+        const [r, g, b] = village.color;
+        bg.strokeStyle = `rgba(${r},${g},${b},0.5)`;
+        bg.lineWidth = 2;
+        for (let y = 0; y < world.gridSize; y++) {
+          for (let x = 0; x < world.gridSize; x++) {
+            const inside = Math.abs(x - village.center.x) + Math.abs(y - village.center.y) <= village.radius;
+            if (!inside) continue;
+            const px = x * cellSize;
+            const py = y * cellSize;
+            if (Math.abs((x - 1) - village.center.x) + Math.abs(y - village.center.y) > village.radius) {
+              bg.beginPath(); bg.moveTo(px, py); bg.lineTo(px, py + cellSize); bg.stroke();
+            }
+            if (Math.abs((x + 1) - village.center.x) + Math.abs(y - village.center.y) > village.radius) {
+              bg.beginPath(); bg.moveTo(px + cellSize, py); bg.lineTo(px + cellSize, py + cellSize); bg.stroke();
+            }
+            if (Math.abs(x - village.center.x) + Math.abs((y - 1) - village.center.y) > village.radius) {
+              bg.beginPath(); bg.moveTo(px, py); bg.lineTo(px + cellSize, py); bg.stroke();
+            }
+            if (Math.abs(x - village.center.x) + Math.abs((y + 1) - village.center.y) > village.radius) {
+              bg.beginPath(); bg.moveTo(px, py + cellSize); bg.lineTo(px + cellSize, py + cellSize); bg.stroke();
+            }
           }
         }
       }
+
+      backgroundCacheRef.current = { key: backgroundKey, canvas: background };
     }
+
+    ctx.clearRect(0, 0, size, size);
+    ctx.drawImage(backgroundCacheRef.current.canvas, 0, 0);
 
     // --- Draw houses ---
     for (const house of world.houses) {
@@ -202,6 +225,7 @@ export function GridCanvas({ world, size, selectedId, onClick }: GridCanvasProps
     // --- Group entities by tile ---
     const tileMap = new Map<number, Entity[]>();
     for (const entity of world.entities) {
+      if (isEntityAtHome(entity, world)) continue;
       const key = entity.position.y * world.gridSize + entity.position.x;
       const group = tileMap.get(key);
       if (group) {
@@ -249,7 +273,7 @@ export function GridCanvas({ world, size, selectedId, onClick }: GridCanvasProps
 
         draws.push({
           cx, cy,
-          color: entityColor(entity, world.villages as any),
+          color: entityColor(entity, world.villages),
           gender: entity.gender,
           age: ageInYears(entity),
           state: entity.state,
@@ -295,6 +319,7 @@ export function GridCanvas({ world, size, selectedId, onClick }: GridCanvasProps
     ctx.setLineDash([3, 3]);
     ctx.lineWidth = 0.5;
     for (const entity of world.entities) {
+      if (isEntityAtHome(entity, world)) continue;
       if (entity.state !== 'idle' || ageInYears(entity) < CHILD_AGE) continue;
       // Only show lines for entities outside their village (actively foraging)
       const eVillage = world.villages.find(v => v.tribe === entity.tribe);

@@ -13,7 +13,9 @@ function causeLabel(cause?: string): string {
   switch (cause) {
     case 'old_age': return 'starość';
     case 'starvation': return 'głód';
+    case 'cold': return 'zimno';
     case 'fight': return 'walka';
+    case 'childbirth': return 'poród';
     default: return '';
   }
 }
