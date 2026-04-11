@@ -135,14 +135,17 @@ function drawStockpileSprite(
   // Bottom: Structures.png|(72 + frame*8), 512, 8, 8
   const frame = Math.floor(tick / 8) % 8;
   const srcX = 72 + frame * 8;
-  const dstW = cellSize;
-  const dstH = cellSize;
+  const scale = 0.7;
+  const dstW = Math.round(cellSize * scale);
+  const dstH = Math.round(cellSize * scale);
+  const dx = Math.round(x + (cellSize - dstW) / 2);
+  const dy = Math.round(y + cellSize - dstH);
 
   ctx.imageSmoothingEnabled = false;
-  // Bottom half (base of fire) at cell position
-  ctx.drawImage(sprites.structures, srcX, 512, 8, 8, Math.round(x), Math.round(y), Math.round(dstW), Math.round(dstH));
-  // Top half (flames) above the cell
-  ctx.drawImage(sprites.structures, srcX, 504, 8, 8, Math.round(x), Math.round(y - dstH), Math.round(dstW), Math.round(dstH));
+  // Bottom half (base of fire) centered in tile
+  ctx.drawImage(sprites.structures, srcX, 512, 8, 8, dx, dy, dstW, dstH);
+  // Top half (flames) above
+  ctx.drawImage(sprites.structures, srcX, 504, 8, 8, dx, dy - dstH, dstW, dstH);
 }
 
 function drawRoadTileSprite(
