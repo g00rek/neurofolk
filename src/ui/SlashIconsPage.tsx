@@ -161,11 +161,23 @@ export function SlashIconsPage() {
           <SpriteAnimation src={UNITS} frames={[24,32,40].map(sx => ({ sx, sy: 128 }))} label="female blue idle" />
           <SpriteAnimation src={UNITS} frames={[24,32,40].map(sx => ({ sx, sy: 120 }))} label="female green idle" />
         </div>
+      </section>
+
+      <section style={sectionStyle}>
+        <h2 style={h2Style}>People Walk Animation (4 frames)</h2>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <SpriteAnimation src={UNITS} frames={[152,160,168,176].map(sx => ({ sx, sy: 32 }))} label="male red walk" />
+          <SpriteAnimation src={UNITS} frames={[152,160,168,176].map(sx => ({ sx, sy: 64 }))} label="male blue walk" />
+          <SpriteAnimation src={UNITS} frames={[152,160,168,176].map(sx => ({ sx, sy: 56 }))} label="male green walk" />
+          <SpriteAnimation src={UNITS} frames={[152,160,168,176].map(sx => ({ sx, sy: 96 }))} label="female red walk" ms={150} />
+          <SpriteAnimation src={UNITS} frames={[152,160,168,176].map(sx => ({ sx, sy: 128 }))} label="female blue walk" ms={150} />
+          <SpriteAnimation src={UNITS} frames={[152,160,168,176].map(sx => ({ sx, sy: 120 }))} label="female green walk" ms={150} />
+        </div>
         <div style={{ marginTop: 8, fontSize: 11, color: '#666' }}>
-          All 3 frames shown individually:
+          All 4 frames shown individually:
         </div>
         <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-          {[24,32,40].map(sx => (
+          {[152,160,168,176].map(sx => (
             <MapSpritePreview key={sx} src={UNITS} sx={sx} sy={32} sw={8} sh={8} wFrac={1} hFrac={1} />
           ))}
         </div>
