@@ -96,8 +96,8 @@ export const ANIMAL_FLEE_RANGE = 1;
 export const HUNT_KILL_RANGE = 3;
 
 // Grass — grows on plains, food for animals
-export const GRASS_GROW_CHANCE = 0.005;  // chance per plains tile per tick to grow grass
-export const GRASS_MAX_PER_TILE = 3;     // max grass portions per tile
+export const GRASS_GROW_CHANCE = 0.001;  // chance per plains tile per tick to grow grass
+export const GRASS_MAX_PER_TILE = 2;     // max grass portions per tile
 
 export interface Tree {
   id: string;

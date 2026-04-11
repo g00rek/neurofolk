@@ -403,7 +403,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
   };
   const grass: number[][] = Array.from({ length: gridSize }, (_, y) =>
     Array.from({ length: gridSize }, (_, x) =>
-      biomes[y][x] === 'plains' && !isNearWater(x, y) && Math.random() < 0.4 ? 1 : 0
+      biomes[y][x] === 'plains' && !isNearWater(x, y) && Math.random() < 0.2 ? 1 : 0
     )
   );
 
