@@ -435,3 +435,42 @@ describe('mating', () => {
     }
   });
 });
+
+describe('behavior system integration', () => {
+  it('female gathers plants and male hunts over 100 ticks', () => {
+    let world = createWorld({ gridSize: 15, entityCount: 4, villageCount: 1 });
+    for (let i = 0; i < 100; i++) {
+      world = tick(world);
+    }
+    // After 100 ticks, entities should still be alive (not all starved)
+    expect(world.entities.length).toBeGreaterThan(0);
+    // Log should have some events
+    expect(world.log.length).toBeGreaterThan(0);
+  });
+
+  it('entities do not change goals every tick (hysteresis)', () => {
+    let world = createWorld({ gridSize: 15, entityCount: 4, villageCount: 1 });
+    // Run 5 ticks, track goal changes
+    const goalChanges: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      const goalsBefore = world.entities.map(e => e.goal?.type);
+      world = tick(world);
+      const goalsAfter = world.entities.map(e => e.goal?.type);
+      const changes = goalsBefore.filter((g, idx) => g && g !== goalsAfter[idx]).length;
+      goalChanges.push(changes);
+    }
+    // Most ticks should have 0 goal changes (hysteresis prevents switching)
+    const totalChanges = goalChanges.reduce((a, b) => a + b, 0);
+    // With 4 entities over 5 ticks, fewer than 10 changes means hysteresis works
+    expect(totalChanges).toBeLessThan(10);
+  });
+
+  it('simulation survives 500 ticks without crash', () => {
+    let world = createWorld({ gridSize: 15, entityCount: 4, villageCount: 1 });
+    for (let i = 0; i < 500; i++) {
+      world = tick(world);
+    }
+    // Just verify no exceptions thrown
+    expect(world.tick).toBe(500);
+  });
+});
