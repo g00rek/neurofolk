@@ -9,6 +9,8 @@ import {
   ANIMAL_REPRO_INTERVAL, ANIMAL_MAX, ANIMAL_HUNT_MIN_POPULATION, ANIMAL_FLEE_RANGE, FOREST_SPEED_PENALTY,
   WOOD_PER_CHOP, WINTER_COLD_DAMAGE, NEAR_HOME_RANGE,
   CHOPPING_DURATION, BUILDING_DURATION, HUNT_KILL_RANGE, HOUSE_WOOD_COST,
+  ANIMAL_ENERGY_MAX, ANIMAL_ENERGY_START, ANIMAL_ENERGY_GRAZE, ANIMAL_ENERGY_DRAIN,
+  ANIMAL_DRAIN_INTERVAL, ANIMAL_REPRO_MIN_ENERGY, GRASS_GROW_CHANCE, GRASS_MAX_PER_TILE,
 } from './types';
 import { generateBiomeGrid, isPassable } from './biomes';
 import type { BiomeGenParams } from './biomes';
@@ -399,6 +401,13 @@ export function createWorld(options: CreateWorldOptions): WorldState {
     }
   }
 
+  // Initialize grass grid: plains tiles start with 1-2 random grass
+  const grass: number[][] = Array.from({ length: gridSize }, (_, y) =>
+    Array.from({ length: gridSize }, (_, x) =>
+      biomes[y][x] === 'plains' ? Math.floor(Math.random() * 2) + 1 : 0
+    )
+  );
+
   const animalCount = scaled(ANIMAL_COUNT, gridSize, 4);
   const animals: Animal[] = [];
   for (let i = 0; i < animalCount; i++) {
@@ -406,6 +415,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
       id: generateId('a'),
       position: randomPassablePos(biomes, gridSize),
       gender: i < animalCount / 2 ? 'male' : 'female',
+      energy: ANIMAL_ENERGY_START,
       reproTimer: Math.floor(Math.random() * ANIMAL_REPRO_INTERVAL),
     });
   }
@@ -428,7 +438,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
     }
   }
 
-  return { entities, animals, trees, houses: [], biomes, villages, tick: 0, gridSize, log: [] };
+  return { entities, animals, trees, houses: [], biomes, villages, grass, tick: 0, gridSize, log: [] };
 }
 
 // --- Interaction detection (fighting/training only — mating removed) ---
@@ -587,6 +597,7 @@ export function tick(state: WorldState): WorldState {
   const animalMax = scaled(ANIMAL_MAX, gridSize, 4);
   const biomes = state.biomes.map(row => [...row]);
   let trees = state.trees.map(t => ({ ...t, position: { ...t.position } }));
+  const grass = state.grass.map(row => [...row]);
   const tickNum = state.tick + 1;
   const updatedVillages = state.villages.map(v => ({ ...v, color: [...v.color] as RGB }));
   function getVillage(tribe: TribeId) {
@@ -1076,18 +1087,24 @@ export function tick(state: WorldState): WorldState {
       newPos = isValidMove(flee, biomes, gridSize)
         ? flee : randomStepBiome(a.position, gridSize, biomes);
     } else {
-      let nearestFruitTree: Tree | undefined;
-      for (const t of trees) {
-        if (!t.hasFruit || t.fruitPortions <= 0) continue;
-        const d = manhattan(a.position, t.position);
-        if (d <= 8 && (!nearestFruitTree || d < manhattan(a.position, nearestFruitTree.position))) {
-          nearestFruitTree = t;
+      // Find nearest grass tile
+      let nearestGrass: Position | undefined;
+      let nearestGrassDist = Infinity;
+      for (let dy = -5; dy <= 5; dy++) {
+        for (let dx = -5; dx <= 5; dx++) {
+          const nx = a.position.x + dx, ny = a.position.y + dy;
+          if (nx < 0 || nx >= gridSize || ny < 0 || ny >= gridSize) continue;
+          if (grass[ny][nx] <= 0) continue;
+          const d = Math.abs(dx) + Math.abs(dy);
+          if (d > 0 && d < nearestGrassDist) {
+            nearestGrassDist = d;
+            nearestGrass = { x: nx, y: ny };
+          }
         }
       }
-      if (nearestFruitTree && Math.random() < 0.15) {
-        // Move toward food ~15% of ticks
-        newPos = stepToward(a.position, nearestFruitTree.position, biomes, gridSize);
-      } else if (a.reproTimer === 0 && Math.random() < 0.2) {
+      if (nearestGrass && Math.random() < 0.15) {
+        newPos = stepToward(a.position, nearestGrass, biomes, gridSize);
+      } else if (a.reproTimer === 0 && a.energy >= ANIMAL_REPRO_MIN_ENERGY && Math.random() < 0.2) {
         // Seek mate: move toward nearest opposite-gender animal (~20% of ticks)
         const oppositeGender = a.gender === 'male' ? 'female' : 'male';
         let nearestMate: Animal | undefined;
@@ -1111,40 +1128,17 @@ export function tick(state: WorldState): WorldState {
     return { ...a, position: newPos, reproTimer: Math.max(0, a.reproTimer - 1) };
   });
 
-  // --- Step 5a: Animals eat from fruit trees and reproduce from that food ---
-  const fedBabyAnimals: Animal[] = [];
+  // --- Step 5a: Animals graze on grass ---
   for (let i = 0; i < animals.length; i++) {
     const a = animals[i];
-    const fruitTreeIdx = trees.findIndex(tr =>
-      tr.hasFruit && tr.fruitPortions > 0 &&
-      tr.position.x === a.position.x && tr.position.y === a.position.y
-    );
-    if (fruitTreeIdx < 0) continue;
-
-    trees[fruitTreeIdx] = {
-      ...trees[fruitTreeIdx],
-      fruitPortions: trees[fruitTreeIdx].fruitPortions - 1,
-      hasFruit: trees[fruitTreeIdx].fruitPortions > 1,
-    };
-    if (a.reproTimer > 0) continue;
-    if (animals.length + fedBabyAnimals.length >= animalMax) continue;
-
-    const spots = neighbors(a.position, gridSize).filter(
-      n => isPassable(biomes[n.y][n.x])
-    );
-    if (spots.length === 0) continue;
-
-    animals[i] = { ...a, reproTimer: ANIMAL_REPRO_INTERVAL };
-    fedBabyAnimals.push({
-      id: generateId('a'),
-      position: spots[Math.floor(Math.random() * spots.length)],
-      gender: Math.random() < 0.5 ? 'male' : 'female',
-      reproTimer: ANIMAL_REPRO_INTERVAL,
-    });
+    const gx = a.position.x, gy = a.position.y;
+    if (grass[gy][gx] > 0 && a.energy < ANIMAL_ENERGY_MAX) {
+      grass[gy][gx]--;
+      animals[i] = { ...a, energy: Math.min(ANIMAL_ENERGY_MAX, a.energy + ANIMAL_ENERGY_GRAZE) };
+    }
   }
-  animals.push(...fedBabyAnimals);
 
-  // --- Step 5b: Reproduce animals (same tile, M+F) ---
+  // --- Step 5b: Reproduce animals (same tile, M+F, requires energy) ---
   if (animals.length < animalMax) {
     const animalTiles = new Map<number, Animal[]>();
     for (const a of animals) {
@@ -1155,8 +1149,8 @@ export function tick(state: WorldState): WorldState {
     }
     const babyAnimals: Animal[] = [];
     for (const [, group] of animalTiles) {
-      const readyMales = group.filter(a => a.gender === 'male' && a.reproTimer === 0);
-      const readyFemales = group.filter(a => a.gender === 'female' && a.reproTimer === 0);
+      const readyMales = group.filter(a => a.gender === 'male' && a.reproTimer === 0 && a.energy >= ANIMAL_REPRO_MIN_ENERGY);
+      const readyFemales = group.filter(a => a.gender === 'female' && a.reproTimer === 0 && a.energy >= ANIMAL_REPRO_MIN_ENERGY);
       if (readyMales.length > 0 && readyFemales.length > 0 && animals.length + babyAnimals.length < animalMax) {
         readyMales[0].reproTimer = ANIMAL_REPRO_INTERVAL;
         readyFemales[0].reproTimer = ANIMAL_REPRO_INTERVAL;
@@ -1166,12 +1160,21 @@ export function tick(state: WorldState): WorldState {
           id: generateId('a'),
           position: ns[Math.floor(Math.random() * ns.length)],
           gender: Math.random() < 0.5 ? 'male' : 'female',
+          energy: ANIMAL_ENERGY_START,
           reproTimer: ANIMAL_REPRO_INTERVAL,
         });
       }
     }
     animals.push(...babyAnimals);
   }
+
+  // --- Step 5c: Animal energy drain and death ---
+  animals = animals.map(a => {
+    if (tickNum % ANIMAL_DRAIN_INTERVAL === 0) {
+      return { ...a, energy: a.energy - ANIMAL_ENERGY_DRAIN };
+    }
+    return a;
+  }).filter(a => a.energy > 0); // dead animals removed
 
   // --- Step 6: Gradual seasonal fruit tree cycle ---
   // Each tick, individual trees have a small chance to transition.
@@ -1204,6 +1207,15 @@ export function tick(state: WorldState): WorldState {
     return t;
   });
 
+  // --- Grass regrowth on plains ---
+  for (let y = 0; y < gridSize; y++) {
+    for (let x = 0; x < gridSize; x++) {
+      if (biomes[y][x] === 'plains' && grass[y][x] < GRASS_MAX_PER_TILE) {
+        if (Math.random() < GRASS_GROW_CHANCE) grass[y][x]++;
+      }
+    }
+  }
+
   // --- Step 7: Pheromone mating (every tick, not just night) ---
   entities = pheromoneMating(entities, updatedVillages, log, tickNum);
 
@@ -1233,5 +1245,5 @@ export function tick(state: WorldState): WorldState {
   }
 
   const fullLog = [...state.log, ...log];
-  return { entities, animals, trees, houses, biomes, villages: updatedVillages, tick: tickNum, gridSize, log: fullLog };
+  return { entities, animals, trees, houses, biomes, villages: updatedVillages, grass, tick: tickNum, gridSize, log: fullLog };
 }

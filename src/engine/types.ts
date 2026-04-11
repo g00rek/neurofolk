@@ -79,15 +79,25 @@ export interface Animal {
   id: string;
   position: Position;
   gender: Gender;
-  reproTimer: number; // ticks until next reproduction attempt
+  energy: number;      // 0-100, dies at 0
+  reproTimer: number;  // ticks until next reproduction attempt
 }
 
+export const ANIMAL_ENERGY_MAX = 100;
+export const ANIMAL_ENERGY_START = 80;
+export const ANIMAL_ENERGY_GRAZE = 15;     // energy gained from eating grass
+export const ANIMAL_ENERGY_DRAIN = 1;      // energy lost per ANIMAL_DRAIN_INTERVAL ticks
+export const ANIMAL_DRAIN_INTERVAL = 30;   // drain energy every N ticks
+export const ANIMAL_REPRO_MIN_ENERGY = 50; // need this much energy to reproduce
 export const ANIMAL_REPRO_INTERVAL = 2400; // 1 year between reproduction per animal
-export const ANIMAL_REPRO_RANGE = 2;     // max animals on nearby tiles to reproduce
-export const ANIMAL_MAX = 80;            // population cap after increasing meat yield
-export const ANIMAL_HUNT_MIN_POPULATION = 12; // preserve a breeding population
-export const ANIMAL_FLEE_RANGE = 1;      // animals flee humans within this range
-export const HUNT_KILL_RANGE = 3;       // bow range — instant kill within this distance
+export const ANIMAL_MAX = 80;              // population cap
+export const ANIMAL_HUNT_MIN_POPULATION = 12;
+export const ANIMAL_FLEE_RANGE = 1;
+export const HUNT_KILL_RANGE = 3;
+
+// Grass — grows on plains, food for animals
+export const GRASS_GROW_CHANCE = 0.005;  // chance per plains tile per tick to grow grass
+export const GRASS_MAX_PER_TILE = 3;     // max grass portions per tile
 
 export interface Tree {
   id: string;
@@ -198,6 +208,7 @@ export interface WorldState {
   houses: House[];
   biomes: Biome[][];
   villages: Village[];
+  grass: number[][];   // grass portions per tile (0 = no grass)
   tick: number;
   gridSize: number;
   log: LogEntry[];
