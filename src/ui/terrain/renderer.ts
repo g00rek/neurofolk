@@ -76,6 +76,7 @@ export function drawWaterLayer(
 
 // Tree canopy: 32×32px sprites, drawn at ~2× cell size, overlapping neighbors
 const TREE_NORMAL = { sx: 64, sy: 408, sw: 32, sh: 32 };
+const TREE_WINTER = { sx: 32, sy: 712, sw: 32, sh: 32 };
 const TREE_FRUIT_EMPTY = { sx: 160, sy: 488, sw: 32, sh: 32 }; // fruit tree, no fruit
 const TREE_FRUIT_FULL = { sx: 112, sy: 488, sw: 32, sh: 32 };  // fruit tree, with fruit
 
@@ -84,7 +85,7 @@ export function drawTreeLayer(
   overworld: HTMLImageElement,
   trees: Tree[],
   cellSize: number,
-  _season: Season,
+  season: Season,
   _biomes?: Biome[][],
 ) {
   ctx.imageSmoothingEnabled = false;
@@ -94,9 +95,14 @@ export function drawTreeLayer(
   const sorted = [...trees].filter(t => !t.chopped).sort((a, b) => a.position.y - b.position.y);
 
   for (const tree of sorted) {
-    const src = tree.fruiting
-      ? (tree.hasFruit && tree.fruitPortions > 0 ? TREE_FRUIT_FULL : TREE_FRUIT_EMPTY)
-      : TREE_NORMAL;
+    let src;
+    if (season === 'winter') {
+      src = TREE_WINTER;
+    } else if (tree.fruiting) {
+      src = tree.hasFruit && tree.fruitPortions > 0 ? TREE_FRUIT_FULL : TREE_FRUIT_EMPTY;
+    } else {
+      src = TREE_NORMAL;
+    }
     const px = tree.position.x * cellSize + Math.round((cellSize - drawSize) / 2);
     const py = tree.position.y * cellSize;
     ctx.drawImage(overworld, src.sx, src.sy, src.sw, src.sh,

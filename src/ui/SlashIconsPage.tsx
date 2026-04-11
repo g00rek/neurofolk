@@ -120,6 +120,7 @@ export function SlashIconsPage() {
         <Row name="tree (normal)" id="Overworld.png|64,408,32,32" preview={<MapSpritePreview src={OVERWORLD} sx={64} sy={408} sw={32} sh={32} wFrac={1} hFrac={1} tileBg="#22301e" />} />
         <Row name="fruit tree (empty)" id="Overworld.png|160,488,32,32" preview={<MapSpritePreview src={OVERWORLD} sx={160} sy={488} sw={32} sh={32} wFrac={1} hFrac={1} tileBg="#22301e" />} />
         <Row name="fruit tree (with fruit)" id="Overworld.png|112,488,32,32" preview={<MapSpritePreview src={OVERWORLD} sx={112} sy={488} sw={32} sh={32} wFrac={1} hFrac={1} tileBg="#22301e" />} />
+        <Row name="tree (winter)" id="Overworld.png|32,712,32,32" preview={<MapSpritePreview src={OVERWORLD} sx={32} sy={712} sw={32} sh={32} wFrac={1} hFrac={1} tileBg="#1b2230" />} />
         <Row name="road tile" id="Overworld.png|32,320,8,8" preview={<MapSpritePreview src={OVERWORLD} sx={32} sy={320} sw={8} sh={8} wFrac={1} hFrac={1} tileBg="#7e9432" />} />
         <Row name="water base anim" id="Overworld.png|8,104,8,8;frames=2;step=24" preview={<MapSpritePreview src={OVERWORLD} sx={8} sy={104} sw={8} sh={8} wFrac={1} hFrac={1} tileBg="#245a5f" />} />
         <Row name="water edge N (rotated NESW)" id="Overworld.png|8,120,8,8" preview={<MapSpritePreview src={OVERWORLD} sx={8} sy={120} sw={8} sh={8} wFrac={1} hFrac={1} tileBg="#245a5f" />} />
