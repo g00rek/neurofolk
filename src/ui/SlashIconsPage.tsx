@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Axe, BowlFood, Hammer, Leaf, Lightning, Moon, PersonSimpleRun, ShieldWarning, Sun, Sword } from '@phosphor-icons/react';
 
 const MINI_MEDIEVAL_BASE = '/assets/mini-medieval/Mini-Medieval-8x8';
@@ -7,6 +7,46 @@ const STRUCTURES = `${MINI_MEDIEVAL_BASE}/Structures.png`;
 const MISC = `${MINI_MEDIEVAL_BASE}/Misc.png`;
 const OVERWORLD = `${MINI_MEDIEVAL_BASE}/Overworld.png`;
 const ANIMALS = `${MINI_MEDIEVAL_BASE}/Animals.png`;
+
+function SpriteAnimation({ src, frames, label, size = 48, ms = 200 }: {
+  src: string;
+  frames: Array<{ sx: number; sy: number }>;
+  label: string;
+  size?: number;
+  ms?: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [frameIdx, setFrameIdx] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setFrameIdx(i => (i + 1) % frames.length), ms);
+    return () => clearInterval(id);
+  }, [frames.length, ms]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const img = new Image();
+    img.onload = () => {
+      const ctx = canvas.getContext('2d')!;
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, size, size);
+      ctx.fillStyle = '#1b1f2b';
+      ctx.fillRect(0, 0, size, size);
+      const f = frames[frameIdx];
+      ctx.drawImage(img, f.sx, f.sy, 8, 8, 0, 0, size, size);
+    };
+    img.src = src;
+  }, [src, frames, frameIdx, size]);
+
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <canvas ref={canvasRef} width={size} height={size} style={{ borderRadius: 4, imageRendering: 'pixelated' as const }} />
+      <div style={{ fontSize: 10, color: '#888', marginTop: 2 }}>{label}</div>
+      <div style={{ fontSize: 9, color: '#555' }}>frame {frameIdx + 1}/{frames.length}</div>
+    </div>
+  );
+}
 
 function MapSpritePreview({
   src,
@@ -109,6 +149,26 @@ export function SlashIconsPage() {
         <Row name="female red" id="Units.png|0,96,8,8" preview={<MapSpritePreview src={UNITS} sx={0} sy={96} sw={8} sh={8} wFrac={0.82} hFrac={0.82} />} />
         <Row name="female blue" id="Units.png|0,128,8,8" preview={<MapSpritePreview src={UNITS} sx={0} sy={128} sw={8} sh={8} wFrac={0.82} hFrac={0.82} />} />
         <Row name="female green" id="Units.png|8,120,8,8" preview={<MapSpritePreview src={UNITS} sx={8} sy={120} sw={8} sh={8} wFrac={0.82} hFrac={0.82} />} />
+      </section>
+
+      <section style={sectionStyle}>
+        <h2 style={h2Style}>People Idle Animation (6 frames)</h2>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <SpriteAnimation src={UNITS} frames={[24,32,40,48,56,64].map(sx => ({ sx, sy: 32 }))} label="male red idle" />
+          <SpriteAnimation src={UNITS} frames={[24,32,40,48,56,64].map(sx => ({ sx, sy: 64 }))} label="male blue idle" />
+          <SpriteAnimation src={UNITS} frames={[24,32,40,48,56,64].map(sx => ({ sx, sy: 56 }))} label="male green idle" />
+          <SpriteAnimation src={UNITS} frames={[24,32,40,48,56,64].map(sx => ({ sx, sy: 96 }))} label="female red idle" />
+          <SpriteAnimation src={UNITS} frames={[24,32,40,48,56,64].map(sx => ({ sx, sy: 128 }))} label="female blue idle" />
+          <SpriteAnimation src={UNITS} frames={[24,32,40,48,56,64].map(sx => ({ sx, sy: 120 }))} label="female green idle" />
+        </div>
+        <div style={{ marginTop: 8, fontSize: 11, color: '#666' }}>
+          All 6 frames shown individually:
+        </div>
+        <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+          {[24,32,40,48,56,64].map(sx => (
+            <MapSpritePreview key={sx} src={UNITS} sx={sx} sy={32} sw={8} sh={8} wFrac={1} hFrac={1} />
+          ))}
+        </div>
       </section>
 
       <section style={sectionStyle}>
