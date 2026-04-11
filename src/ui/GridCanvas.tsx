@@ -77,7 +77,7 @@ function drawPersonSprite(
   const sx = sxArr[frameIdx % sxArr.length];
 
   const renderScale = isChild ? 0.68 : 0.82;
-  const dstSize = Math.max(8, cellSize * renderScale);
+  const dstSize = Math.round(Math.max(8, cellSize * renderScale));
   const dx = Math.round(cx - dstSize / 2);
   const dy = Math.round(cy - dstSize / 2);
 
@@ -113,10 +113,10 @@ function drawHouseSprite(
   const srcW = 32;
   const srcH = 40;
   // Full cell width; roof may overshoot above the tile.
-  const dstW = cellSize;
-  const dstH = cellSize * (srcH / srcW); // preserve aspect ratio
+  const dstW = Math.round(cellSize);
+  const dstH = Math.round(cellSize * (srcH / srcW));
   const dx = Math.round(x);
-  const dy = Math.round(y + cellSize - dstH); // bottom-aligned, roof sticks up
+  const dy = Math.round(y + cellSize - dstH);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(sprites.structures, srcX, srcY, srcW, srcH, dx, dy, Math.round(dstW), Math.round(dstH));
 }
@@ -185,8 +185,8 @@ function drawAnimalSprite(
 ) {
   const frames = moving ? ANIMAL_RUN[gender] : ANIMAL_IDLE[gender];
   const frame = frames[frameIdx % frames.length];
-  const dstW = cellSize * 0.86;
-  const dstH = cellSize * 0.86;
+  const dstW = Math.round(cellSize * 0.86);
+  const dstH = Math.round(cellSize * 0.86);
   const dx = Math.round(cx - dstW / 2);
   const dy = Math.round(cy - dstH / 2);
   ctx.imageSmoothingEnabled = false;
