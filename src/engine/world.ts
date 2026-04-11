@@ -1191,9 +1191,12 @@ export function tick(state: WorldState): WorldState {
         newPos = nearestMate
           ? stepToward(a.position, nearestMate.position, biomes, gridSize, houseTiles)
           : a.position;
-      } else if (herdCenter && herdDist > 4 && Math.random() < 0.6) {
-        // Herding — move toward center of mass of all animals
+      } else if (herdCenter && herdDist > 5 && Math.random() < 0.6) {
+        // Far from herd — move toward center of mass
         newPos = stepToward(a.position, herdCenter, biomes, gridSize, houseTiles);
+      } else if (herdDist <= 5 && Math.random() < 0.1) {
+        // Close to herd — occasional random wander (grazing drift)
+        newPos = randomStepBiome(a.position, gridSize, biomes, houseTiles);
       } else {
         newPos = a.position;
       }
