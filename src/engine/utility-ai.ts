@@ -74,21 +74,13 @@ function totalVillageFood(ctx: AIContext): number {
 function survivalForageAction(ctx: AIContext, survivalScore: number): AIAction | undefined {
   if (survivalScore === 0) return undefined;
 
-  if (ctx.entity.gender === 'female') {
-    if (ctx.nearestPlant) return { type: 'go_gather', target: ctx.nearestPlant.pos };
-    if (ctx.nearestForest) return { type: 'go_gather', target: ctx.nearestForest.pos };
-  }
-
-  if (ctx.entity.gender === 'male'
-      && ctx.animalPopulation > scaled(ANIMAL_HUNT_MIN_POPULATION, ctx.gridSize, 2)
-      && ctx.nearestAnimal) {
+  // Nearest food source — plant first (both genders), then hunt for males
+  if (ctx.nearestPlant) return { type: 'go_gather', target: ctx.nearestPlant.pos };
+  if (ctx.entity.gender === 'male' && ctx.nearestAnimal
+      && ctx.animalPopulation > scaled(ANIMAL_HUNT_MIN_POPULATION, ctx.gridSize, 2)) {
     return { type: 'go_hunt', target: ctx.nearestAnimal.pos };
   }
-
-  if (ctx.entity.gender === 'male') {
-    if (ctx.nearestPlant) return { type: 'go_gather', target: ctx.nearestPlant.pos };
-    if (ctx.nearestForest) return { type: 'go_gather', target: ctx.nearestForest.pos };
-  }
+  if (ctx.nearestForest) return { type: 'go_gather', target: ctx.nearestForest.pos };
 
   if (!ctx.nearHome && ctx.village && totalVillageFood(ctx) > 0) {
     return { type: 'return_home' };
