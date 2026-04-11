@@ -8,10 +8,11 @@ import {
   PLANT_PORTIONS, PLANT_PORTIONS_PER_GATHER, PLANT_SPRING_FRUIT_CHANCE, FIGHT_MIN_AGE, MEAT_PORTIONS_PER_HUNT,
   ANIMAL_REPRO_INTERVAL, ANIMAL_MAX, ANIMAL_HUNT_MIN_POPULATION, ANIMAL_FLEE_RANGE, FOREST_SPEED_PENALTY, FOREST_PLANT_BONUS,
   WOOD_PER_CHOP, WINTER_COLD_DAMAGE, NEAR_HOME_RANGE,
+  CHOPPING_DURATION, BUILDING_DURATION, HUNT_KILL_RANGE, HOUSE_WOOD_COST,
 } from './types';
 import { generateBiomeGrid, isPassable } from './biomes';
 import type { BiomeGenParams } from './biomes';
-import { decideAction, buildAIContext, actionToGoal } from './utility-ai';
+import { decideAction, buildAIContext, actionToGoal, shouldReEvaluate } from './utility-ai';
 import { randomName } from './names';
 
 interface CreateWorldOptions {
@@ -928,13 +929,28 @@ export function tick(state: WorldState): WorldState {
       entities[idx] = entity;
     }
 
+    // Periodic re-evaluation with hysteresis
+    if (entity.goal && tickNum > 0 && (tickNum - entity.goalSetTick) % 20 === 0) {
+      const ctx = buildAIContext(entity, updatedVillages, animals, plants, entities, biomes, gridSize, tickNum, houses);
+      const result = shouldReEvaluate(ctx, entity.goal.type, entity.goalSetTick, tickNum);
+      if (result.interrupt && result.newAction) {
+        const goal = actionToGoal(result.newAction, ctx);
+        if (goal) {
+          entity = { ...entity, goal, goalSetTick: tickNum };
+        } else {
+          entity = { ...entity, goal: undefined, goalSetTick: tickNum };
+        }
+        entities[idx] = entity;
+      }
+    }
+
     // Get goal from utility-AI if none
     if (!entity.goal) {
       const ctx = buildAIContext(entity, updatedVillages, animals, plants, entities, biomes, gridSize, tickNum, houses);
       const action = decideAction(ctx);
       const goal = actionToGoal(action, ctx);
       if (goal) {
-        entity = { ...entity, goal };
+        entity = { ...entity, goal, goalSetTick: tickNum };
         entities[idx] = entity;
       } else {
         // Non-goal action (rest, play, wander) — execute once
@@ -981,10 +997,52 @@ export function tick(state: WorldState): WorldState {
           entity = { ...entity, position: moveTarget };
           entities[idx] = entity;
 
-          // Arrived at goal target?
+          // Arrived at goal target — resolve action
           if (entity.goal?.target && entity.position.x === entity.goal.target.x && entity.position.y === entity.goal.target.y) {
+            const goalType = entity.goal.type;
             entity = { ...entity, goal: undefined };
             entities[idx] = entity;
+
+            if (goalType === 'hunt') {
+              const prey = animals.findIndex(a =>
+                Math.abs(a.position.x - entity.position.x) + Math.abs(a.position.y - entity.position.y) <= HUNT_KILL_RANGE
+              );
+              if (prey >= 0) {
+                animals.splice(prey, 1);
+                const direct = eatDirectlyToThreshold(entity, ENERGY_MEAT, MEAT_PORTIONS_PER_HUNT);
+                const v = getVillage(entity.tribe);
+                if (v) v.meatStore += direct.remainingPortions;
+                entity = direct.entity;
+                entities[idx] = entity;
+                logEvent(entity, 'hunt');
+              }
+            } else if (goalType === 'gather') {
+              const pi = plants.findIndex(p =>
+                p.portions > 0 && p.position.x === entity.position.x && p.position.y === entity.position.y
+              );
+              if (pi >= 0) {
+                plants[pi] = { ...plants[pi], portions: plants[pi].portions - 1 };
+                const direct = eatDirectlyToThreshold(entity, ENERGY_PLANT, PLANT_PORTIONS_PER_GATHER);
+                const v = getVillage(entity.tribe);
+                if (v && villageNeedsFood(v, entities)) v.plantStore += direct.remainingPortions;
+                entity = direct.entity;
+                entities[idx] = entity;
+              }
+            } else if (goalType === 'chop') {
+              if (biomes[entity.position.y][entity.position.x] === 'forest') {
+                entity = { ...entity, state: 'chopping' as const, stateTimer: CHOPPING_DURATION, goal: undefined };
+                entities[idx] = entity;
+              }
+            } else if (goalType === 'build') {
+              const v = getVillage(entity.tribe);
+              if (v && v.woodStore >= HOUSE_WOOD_COST
+                  && !isRoadTile(entity.position, biomes)
+                  && !hasStructureAt(entity.position, houses, updatedVillages)) {
+                v.woodStore -= HOUSE_WOOD_COST;
+                entity = { ...entity, state: 'building' as const, stateTimer: BUILDING_DURATION, goal: undefined };
+                entities[idx] = entity;
+              }
+            }
             break;
           }
 
