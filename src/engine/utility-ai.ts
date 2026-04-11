@@ -307,23 +307,11 @@ export function buildAIContext(
     }
   }
 
-  // Find nearest standing tree on forest EDGE (adjacent to non-forest tile)
+  // Find nearest standing (not chopped) tree
   let nearestForest: AIContext['nearestForest'];
   for (const tr of trees) {
     if (tr.chopped) continue;
-    // Check if this tree borders a non-forest tile (edge tree)
-    const tx = tr.position.x, ty = tr.position.y;
-    let isEdge = false;
-    for (let dy = -1; dy <= 1 && !isEdge; dy++) {
-      for (let dx = -1; dx <= 1 && !isEdge; dx++) {
-        if (dx === 0 && dy === 0) continue;
-        const nx = tx + dx, ny = ty + dy;
-        if (nx < 0 || nx >= gridSize || ny < 0 || ny >= gridSize) { isEdge = true; continue; }
-        if (biomes[ny][nx] !== 'forest') isEdge = true;
-      }
-    }
-    if (!isEdge) continue;
-    const d = Math.abs(tx - entity.position.x) + Math.abs(ty - entity.position.y);
+    const d = Math.abs(tr.position.x - entity.position.x) + Math.abs(tr.position.y - entity.position.y);
     if (d > 0 && (!nearestForest || d < nearestForest.dist)) {
       nearestForest = { pos: tr.position, dist: d };
     }
