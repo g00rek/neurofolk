@@ -136,16 +136,17 @@ function AnimatedHouse({ roofSx = 40, roofSy, chimneySy = 208, label }: { roofSx
         const s = 8 * scale;
 
         const chimSx = 88 + frame * 8;
+        const chimOff = Math.round(s * 0.5); // shift chimney up by half tile
 
-        // Row 0: chimney smoke (top) on right column
-        ctx.drawImage(img, chimSx, chimneySy, 8, 8, 2 * s, 0, s, s);
+        // Chimney smoke above roof
+        ctx.drawImage(img, chimSx, chimneySy, 8, 8, 2 * s, s - chimOff - s, s, s);
 
-        // Row 1: roof top row + chimney base on right
+        // Row 1: roof top row
         ctx.drawImage(img, roofSx, roofSy, 8, 8, 0, s, s, s);
         ctx.drawImage(img, roofSx + 8, roofSy, 8, 8, s, s, s, s);
         ctx.drawImage(img, roofSx + 16, roofSy, 8, 8, 2 * s, s, s, s);
-        // Draw chimney base on top of roof tile
-        ctx.drawImage(img, chimSx, chimneySy + 8, 8, 8, 2 * s, s, s, s);
+        // Chimney base on top of roof tile
+        ctx.drawImage(img, chimSx, chimneySy + 8, 8, 8, 2 * s, s - chimOff, s, s);
 
         // Row 2: roof bottom row
         ctx.drawImage(img, roofSx, roofSy + 8, 8, 8, 0, 2 * s, s, s);
