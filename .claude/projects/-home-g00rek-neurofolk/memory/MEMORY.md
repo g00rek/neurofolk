@@ -1,2 +1,3 @@
 - [Project vision](project_vision.md) — neural networks, per-civ learning, genetics, skill trees
 - [Execution preference](feedback_execution.md) — always use subagent-driven development, don't ask
+- [Future classes](project_classes.md) — Hunter class with bow (ranged kill), profession system planned

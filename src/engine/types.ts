@@ -81,6 +81,7 @@ export interface Animal {
   gender: Gender;
   energy: number;      // 0-100, dies at 0
   reproTimer: number;  // ticks until next reproduction attempt
+  panicTicks: number;  // ticks remaining of flee behavior after seeing human
 }
 
 export const ANIMAL_ENERGY_MAX = 100;

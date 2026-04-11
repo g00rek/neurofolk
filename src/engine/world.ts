@@ -464,6 +464,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
       gender: i < animalCount / 2 ? 'male' : 'female',
       energy: ANIMAL_ENERGY_START,
       reproTimer: Math.floor(Math.random() * ANIMAL_REPRO_INTERVAL),
+      panicTicks: 0,
     });
   }
 
@@ -1159,15 +1160,29 @@ export function tick(state: WorldState): WorldState {
         nearestHumanPos = e.position;
       }
     }
-    if (nearestHumanPos && tickNum % 2 === 0) {
-      // Animals react every 2 ticks — gives faster hunters a chance to close in
-      const dx = a.position.x - nearestHumanPos.x;
-      const dy = a.position.y - nearestHumanPos.y;
-      const flee = Math.abs(dx) >= Math.abs(dy)
-        ? { x: a.position.x + Math.sign(dx || 1), y: a.position.y }
-        : { x: a.position.x, y: a.position.y + Math.sign(dy || 1) };
+    // Panic: set 6 tick panic when human spotted, keep fleeing while panicked
+    let panicTicks = a.panicTicks;
+    if (nearestHumanPos) {
+      panicTicks = 6; // refresh panic
+    }
+
+    if (panicTicks > 0 && tickNum % 2 === 0) {
+      // Flee away from last known human direction (or random if no human visible)
+      const fleeFrom = nearestHumanPos ?? { x: a.position.x, y: a.position.y };
+      const dx = a.position.x - fleeFrom.x;
+      const dy = a.position.y - fleeFrom.y;
+      const flee = (dx !== 0 || dy !== 0)
+        ? (Math.abs(dx) >= Math.abs(dy)
+          ? { x: a.position.x + Math.sign(dx), y: a.position.y }
+          : { x: a.position.x, y: a.position.y + Math.sign(dy) })
+        : randomStepBiome(a.position, gridSize, biomes, houseTiles);
       newPos = isValidMove(flee, biomes, gridSize, houseTiles)
         ? flee : randomStepBiome(a.position, gridSize, biomes, houseTiles);
+      panicTicks--;
+    } else if (panicTicks > 0) {
+      // Odd tick during panic — stay (reaction delay)
+      newPos = a.position;
+      panicTicks--;
     } else {
       // Find nearest grass tile
       let nearestGrass: Position | undefined;
@@ -1236,7 +1251,7 @@ export function tick(state: WorldState): WorldState {
       animalOccupied.delete(oldKey);
       animalOccupied.add(newKey);
     }
-    animals[ai] = { ...a, position: newPos, reproTimer: Math.max(0, a.reproTimer - 1) };
+    animals[ai] = { ...a, position: newPos, reproTimer: Math.max(0, a.reproTimer - 1), panicTicks };
   }
 
   // --- Step 5a: Animals graze on grass ---
@@ -1273,6 +1288,7 @@ export function tick(state: WorldState): WorldState {
         gender: Math.random() < 0.5 ? 'male' : 'female',
         energy: ANIMAL_ENERGY_START,
         reproTimer: ANIMAL_REPRO_INTERVAL,
+        panicTicks: 0,
       });
     }
     animals.push(...babyAnimals);
