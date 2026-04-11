@@ -118,11 +118,11 @@ function drawHouseSprite(
   const srcY = rowByTribe[Math.max(0, Math.min(2, tribe))];
   const srcW = 32;
   const srcH = 40;
-  // Full cell width; roof may overshoot above the tile.
-  const dstW = Math.round(cellSize);
-  const dstH = Math.round(cellSize * (srcH / srcW));
+  // Scale sprite to cover 3×3 tiles
+  const dstW = Math.round(cellSize * 3);
+  const dstH = Math.round(cellSize * 3 * (srcH / srcW));
   const dx = Math.round(x);
-  const dy = Math.round(y + cellSize - dstH);
+  const dy = Math.round(y + cellSize * 3 - dstH);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(sprites.structures, srcX, srcY, srcW, srcH, dx, dy, Math.round(dstW), Math.round(dstH));
 }

@@ -2,14 +2,15 @@ import type { Entity, EntityGoal, Position, Animal, Tree, House, Village, Biome,
 import {
   CHILD_AGE,
   ANIMAL_HUNT_MIN_POPULATION, scaled,
-  FOOD_RESERVE_MAX,
   FOOD_RESERVE_MIN,
   FOOD_RESERVE_PER_PERSON,
   HUNGER_THRESHOLD,
   PLANT_RESERVE_MIN,
   NEAR_HOME_RANGE,
+  HOUSE_CAPACITY,
+  HOUSE_WOOD_COST,
 } from './types';
-import { ageInYears } from './world';
+import { ageInYears, isValid3x3BuildSite } from './world';
 
 // --- Role configuration ---
 export interface RoleConfig {
@@ -59,7 +60,7 @@ const PANIC_PLANT_THRESHOLD = 20;
 // --- Scoring functions (0-1, higher = more urgent) ---
 
 function foodReserveTarget(ctx: AIContext): number {
-  return Math.min(FOOD_RESERVE_MAX, Math.max(FOOD_RESERVE_MIN, ctx.tribePopulation * FOOD_RESERVE_PER_PERSON));
+  return Math.max(FOOD_RESERVE_MIN, ctx.tribePopulation * FOOD_RESERVE_PER_PERSON);
 }
 
 function totalVillageFood(ctx: AIContext): number {
@@ -96,7 +97,7 @@ function scoreSurvival(ctx: AIContext): number {
 function scoreBuildHome(ctx: AIContext): number {
   if (ageInYears(ctx.entity) < CHILD_AGE) return 0;
   if (!ctx.villageNeedsHouses) return 0;
-  if (!ctx.village || ctx.village.woodStore < 5) return 0; // not enough wood yet → go chop
+  if (!ctx.village || ctx.village.woodStore < HOUSE_WOOD_COST) return 0; // not enough wood yet → go chop
   return 0.85;
 }
 
@@ -104,8 +105,8 @@ function scoreChopFirewood(ctx: AIContext): number {
   if (ageInYears(ctx.entity) < CHILD_AGE) return 0;
   if (!ctx.village) return 0;
   // Only chop if village actually needs wood (for building houses)
-  if (!ctx.villageNeedsHouses && ctx.village.woodStore >= 5) return 0;
-  const woodTarget = ctx.villageNeedsHouses ? 10 : 5; // enough for 1-2 houses
+  if (!ctx.villageNeedsHouses && ctx.village.woodStore >= HOUSE_WOOD_COST) return 0;
+  const woodTarget = ctx.villageNeedsHouses ? HOUSE_WOOD_COST * 2 : HOUSE_WOOD_COST; // enough for 1-2 houses
   if (ctx.village.woodStore >= woodTarget) return 0;
   const woodNeed = (woodTarget - ctx.village.woodStore) / woodTarget;
   return woodNeed * 0.5;
@@ -261,23 +262,25 @@ export function buildAIContext(
 ): AIContext {
   const village = villages.find(v => v.tribe === entity.tribe);
 
-  // nearHome: within NEAR_HOME_RANGE of any tribe house
+  // nearHome: within NEAR_HOME_RANGE of any tribe house center
   const tribeHouses = houses.filter(h => h.tribe === entity.tribe);
+  const houseCenter = (h: { position: Position }) => ({ x: h.position.x + 1, y: h.position.y + 1 });
   const nearHome = tribeHouses.some(h =>
-    manhattan(entity.position, h.position) <= NEAR_HOME_RANGE
+    manhattan(entity.position, houseCenter(h)) <= NEAR_HOME_RANGE + 1
   );
 
-  // homeTarget: own house or nearest tribe house
+  // homeTarget: own house center or nearest tribe house center
   let homeTarget: Position | undefined;
   if (entity.homeId) {
     const home = houses.find(h => h.id === entity.homeId);
-    if (home) homeTarget = home.position;
+    if (home) homeTarget = houseCenter(home);
   }
   if (!homeTarget && tribeHouses.length > 0) {
     let bestDist = Infinity;
     for (const h of tribeHouses) {
-      const d = manhattan(entity.position, h.position);
-      if (d < bestDist) { bestDist = d; homeTarget = h.position; }
+      const center = houseCenter(h);
+      const d = manhattan(entity.position, center);
+      if (d < bestDist) { bestDist = d; homeTarget = center; }
     }
   }
 
@@ -317,36 +320,34 @@ export function buildAIContext(
     }
   }
 
-  // Village needs houses: homeless adult females > free houses
-  const homelessFemales = village
-    ? entities.filter(e => e.tribe === village.tribe && e.gender === 'female' && ageInYears(e) >= CHILD_AGE && !e.homeId).length
+  // Village needs houses: homeless adults > free slots in existing houses
+  const tribeHousesForVillage = village
+    ? houses.filter(h => h.tribe === village.tribe)
+    : [];
+  const totalFreeSlots = tribeHousesForVillage.reduce((s, h) => s + (HOUSE_CAPACITY - h.occupants.length), 0);
+  const homelessAdults = village
+    ? entities.filter(e => e.tribe === village.tribe && ageInYears(e) >= CHILD_AGE && !e.homeId).length
     : 0;
-  const freeHouses = village
-    ? houses.filter(h => h.tribe === village.tribe && !h.occupantId).length
-    : 0;
-  const villageNeedsHouses = homelessFemales > freeHouses;
+  const villageNeedsHouses = homelessAdults > totalFreeSlots;
 
-  // Find nearest valid build site (adjacent to existing house/stockpile, passable, not occupied)
+  // Find nearest valid 3×3 build site
   let nearestBuildSite: AIContext['nearestBuildSite'];
   if (villageNeedsHouses && village) {
-    const occupiedTiles = new Set<string>();
-    for (const h of houses) occupiedTiles.add(`${h.position.x},${h.position.y}`);
-    if (village.stockpile) occupiedTiles.add(`${village.stockpile.x},${village.stockpile.y}`);
-
-    // Anchor tiles: existing tribe houses or stockpile
-    const anchors: Position[] = tribeHouses.map(h => h.position);
+    // Anchor tiles: existing tribe houses (center) or stockpile
+    const anchors: Position[] = tribeHouses.map(h => ({ x: h.position.x + 1, y: h.position.y + 1 }));
     if (anchors.length === 0 && village.stockpile) anchors.push(village.stockpile);
 
-    // Search within distance 2 of anchors for valid build sites
+    // Search within distance 8 of anchors for valid 3×3 build sites
+    const checked = new Set<string>();
     for (const anchor of anchors) {
-      for (let dy = -2; dy <= 2; dy++) {
-        for (let dx = -2; dx <= 2; dx++) {
-          if (dx === 0 && dy === 0) continue;
+      for (let dy = -8; dy <= 8; dy++) {
+        for (let dx = -8; dx <= 8; dx++) {
           const nx = anchor.x + dx, ny = anchor.y + dy;
-          if (nx < 0 || nx >= gridSize || ny < 0 || ny >= gridSize) continue;
-          const biome = biomes[ny][nx];
-          if (biome === 'water' || biome === 'mountain') continue;
-          if (occupiedTiles.has(`${nx},${ny}`)) continue;
+          const key = `${nx},${ny}`;
+          if (checked.has(key)) continue;
+          checked.add(key);
+          if (nx < 0 || nx >= gridSize - 2 || ny < 0 || ny >= gridSize - 2) continue;
+          if (!isValid3x3BuildSite(nx, ny, biomes, gridSize, houses, villages)) continue;
           const d = Math.abs(nx - entity.position.x) + Math.abs(ny - entity.position.y);
           if (!nearestBuildSite || d < nearestBuildSite.dist) {
             nearestBuildSite = { pos: { x: nx, y: ny }, dist: d };

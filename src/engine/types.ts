@@ -33,7 +33,7 @@ export interface Village {
 }
 
 export const WOOD_PER_CHOP = 3;           // wood portions from chopping 1 forest tile
-export const HOUSE_WOOD_COST = 5;         // wood needed from warehouse to build a house
+export const HOUSE_WOOD_COST = 15;        // wood needed to build a 3×3 house
 export const WINTER_WOOD_COST = 1;        // wood reserved per house for the whole winter
 export const WINTER_COLD_DAMAGE = 2;      // energy lost per tick without heating in winter
 
@@ -115,7 +115,7 @@ export const TREE_REGROW_TICKS = 7200; // ~3 years for chopped tree to regrow
 export const FOREST_REGROW_TIME = 7200; // legacy alias
 export const FIGHT_MIN_AGE = 16;
 export const CHOPPING_DURATION = 5;  // half day
-export const BUILDING_DURATION = 20; // 2 days
+export const BUILDING_DURATION = 40; // 4 days for a 3×3 house
 // Speed trait = tiles per tick (1-3). No multiplier — 1 tick = 1 step at speed 1.
 export const TICKS_PER_DAY = 20; // 10 day + 10 night
 export const DAY_TICKS = 10;     // first 10 ticks = daytime
@@ -125,10 +125,12 @@ export const MATE_COOLDOWN = 200;      // ticks after impregnation before male c
 
 export interface House {
   id: string;
-  position: Position;
+  position: Position;  // top-left corner of 3×3 area
   tribe: TribeId;
-  occupantId?: string; // female who lives here
+  occupants: string[]; // entity IDs living here (max HOUSE_CAPACITY)
 }
+
+export const HOUSE_CAPACITY = 6;         // max people per house
 
 // Population (gameplay-tuned)
 export const MIN_REPRODUCTIVE_AGE = 12;
@@ -155,9 +157,8 @@ export const CHILD_AGE = 3; // children don't work/fight/lose energy (years)
 export const INFANT_MORTALITY = 0.3; // 30% chance child dies at birth (historical rate)
 export const MATERNAL_MORTALITY = 0.05; // 5% chance mother dies per birth
 
-export const FOOD_RESERVE_PER_PERSON = 4;
-export const FOOD_RESERVE_MIN = 30;
-export const FOOD_RESERVE_MAX = 120;
+export const FOOD_RESERVE_PER_PERSON = 3; // portions per person for "gather urgently" threshold
+export const FOOD_RESERVE_MIN = 10;       // minimum even for tiny populations
 export const PLANT_RESERVE_MIN = 20;
 
 // Resources — base values tuned for 30×30 (900 tiles)

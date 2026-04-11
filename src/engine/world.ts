@@ -3,12 +3,12 @@ import {
   MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE, TICKS_PER_YEAR,
   PREGNANCY_DURATION, BIRTH_COOLDOWN, INFANT_MORTALITY, MATERNAL_MORTALITY, FIGHTING_DURATION, TICKS_PER_DAY, MATE_COOLDOWN,
   ENERGY_MAX, ENERGY_START, ENERGY_DRAIN_INTERVAL, ENERGY_MEAT, ENERGY_PLANT,
-  FOOD_RESERVE_MAX, FOOD_RESERVE_MIN, FOOD_RESERVE_PER_PERSON, HUNGER_THRESHOLD, CHILD_AGE, TRAIT_ENERGY_COST, PLANT_RESERVE_MIN,
+  FOOD_RESERVE_MIN, FOOD_RESERVE_PER_PERSON, HUNGER_THRESHOLD, CHILD_AGE, TRAIT_ENERGY_COST, PLANT_RESERVE_MIN,
   ANIMAL_COUNT, scaled,
   FIGHT_MIN_AGE, MEAT_PORTIONS_PER_HUNT, TREE_FRUIT_PORTIONS,
   ANIMAL_REPRO_INTERVAL, ANIMAL_MAX, ANIMAL_HUNT_MIN_POPULATION, ANIMAL_FLEE_RANGE, FOREST_SPEED_PENALTY,
   WOOD_PER_CHOP, WINTER_COLD_DAMAGE, NEAR_HOME_RANGE,
-  CHOPPING_DURATION, BUILDING_DURATION, HUNT_KILL_RANGE, HOUSE_WOOD_COST,
+  CHOPPING_DURATION, BUILDING_DURATION, HUNT_KILL_RANGE, HOUSE_WOOD_COST, HOUSE_CAPACITY,
   ANIMAL_ENERGY_MAX, ANIMAL_ENERGY_START, ANIMAL_ENERGY_GRAZE, ANIMAL_ENERGY_DRAIN,
   ANIMAL_DRAIN_INTERVAL, ANIMAL_REPRO_MIN_ENERGY, GRASS_GROW_CHANCE, GRASS_MAX_PER_TILE,
 } from './types';
@@ -59,12 +59,20 @@ function isChild(e: Entity): boolean {
 
 function homePosition(e: Entity, houses: House[]): Position | undefined {
   if (!e.homeId) return undefined;
-  return houses.find(h => h.id === e.homeId)?.position;
+  const h = houses.find(h => h.id === e.homeId);
+  if (!h) return undefined;
+  // Return center of 3×3 house
+  return { x: h.position.x + 1, y: h.position.y + 1 };
 }
 
 function isAtHome(e: Entity, houses: House[]): boolean {
-  const home = homePosition(e, houses);
-  return !!home && e.position.x === home.x && e.position.y === home.y;
+  if (!e.homeId) return false;
+  const house = houses.find(h => h.id === e.homeId);
+  if (!house) return false;
+  // Entity is "at home" if within the 3×3 area
+  const dx = e.position.x - house.position.x;
+  const dy = e.position.y - house.position.y;
+  return dx >= 0 && dx < 3 && dy >= 0 && dy < 3;
 }
 
 function clamp(v: number, min: number, max: number): number {
@@ -88,7 +96,7 @@ function eatDirectlyToThreshold(entity: Entity, portionEnergy: number, available
 }
 
 function villageFoodReserveTarget(population: number): number {
-  return Math.min(FOOD_RESERVE_MAX, Math.max(FOOD_RESERVE_MIN, population * FOOD_RESERVE_PER_PERSON));
+  return Math.max(FOOD_RESERVE_MIN, population * FOOD_RESERVE_PER_PERSON);
 }
 
 function villageNeedsFood(village: Village | undefined, entities: Entity[]): boolean {
@@ -228,19 +236,47 @@ function randomPos(gridSize: number): Position {
   };
 }
 
+function houseCenterPos(h: House): Position {
+  return { x: h.position.x + 1, y: h.position.y + 1 };
+}
+
 function isNearTribeHouses(pos: Position, tribe: TribeId, houses: House[]): boolean {
-  return houses.some(h => h.tribe === tribe && manhattan(pos, h.position) <= NEAR_HOME_RANGE);
+  return houses.some(h => h.tribe === tribe && manhattan(pos, houseCenterPos(h)) <= NEAR_HOME_RANGE + 1);
 }
 
-function hasStructureAt(pos: Position, houses: House[], villages: Village[]): boolean {
-  const hasHouse = houses.some(h => h.position.x === pos.x && h.position.y === pos.y);
-  if (hasHouse) return true;
-  return villages.some(v => v.stockpile?.x === pos.x && v.stockpile?.y === pos.y);
+
+/** Check if a 3×3 house can be placed at (x,y) as top-left corner */
+export function isValid3x3BuildSite(
+  x: number, y: number,
+  biomes: Biome[][], gridSize: number,
+  houses: House[], villages: Village[],
+): boolean {
+  // Check 3×3 area + 1-tile buffer (5×5 total)
+  for (let dy = -1; dy <= 3; dy++) {
+    for (let dx = -1; dx <= 3; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || nx >= gridSize || ny < 0 || ny >= gridSize) return false;
+      const b = biomes[ny][nx];
+      // Inner 3×3 must be plains
+      if (dx >= 0 && dx < 3 && dy >= 0 && dy < 3) {
+        if (b !== 'plains') return false;
+      }
+      // Buffer must not be water
+      if (b === 'water') return false;
+    }
+  }
+  // At least 2 tiles from stockpile (distance between 3×3 top-left and stockpile)
+  for (const v of villages) {
+    if (!v.stockpile) continue;
+    if (Math.abs(v.stockpile.x - x) < 4 && Math.abs(v.stockpile.y - y) < 4) return false;
+  }
+  // No overlap with existing houses (each house is 3×3, require 1-tile gap → distance >= 4)
+  for (const h of houses) {
+    if (Math.abs(h.position.x - x) < 4 && Math.abs(h.position.y - y) < 4) return false;
+  }
+  return true;
 }
 
-function isRoadTile(pos: Position, biomes: Biome[][]): boolean {
-  return biomes[pos.y]?.[pos.x] === 'road';
-}
 
 function randomPassablePos(biomes: Biome[][], gridSize: number): Position {
   for (let i = 0; i < 100; i++) {
@@ -606,7 +642,7 @@ export function tick(state: WorldState): WorldState {
     log.push({ tick: tickNum, type, entityId: e.id, name: e.name, gender: e.gender, age: e.age, ...extra });
   }
   let animals = state.animals.map(a => ({ ...a, position: { ...a.position } }));
-  let houses = state.houses.map(h => ({ ...h, position: { ...h.position } }));
+  let houses = state.houses.map(h => ({ ...h, position: { ...h.position }, occupants: [...h.occupants] }));
   const stockpileTiles = new Set(
     updatedVillages
       .filter(v => v.stockpile)
@@ -646,28 +682,28 @@ export function tick(state: WorldState): WorldState {
   for (const e of aged) {
     if (e.age >= e.maxAge) {
       logEvent(e, 'death', { cause: 'old_age' });
+      // Remove from house occupants
+      for (const h of houses) {
+        const idx = h.occupants.indexOf(e.id);
+        if (idx >= 0) h.occupants.splice(idx, 1);
+      }
     } else if (e.energy <= 0) {
       logEvent(e, 'death', { cause: e.coldExposure ? 'cold' : 'starvation' });
+      for (const h of houses) {
+        const idx = h.occupants.indexOf(e.id);
+        if (idx >= 0) h.occupants.splice(idx, 1);
+      }
     } else {
       entities.push({ ...e, coldExposure: false });
     }
   }
 
-  // --- Step 0b: Evict grown-up children from mother's house ---
-  // Males never own houses; females get their own when one is free
+  // --- Step 0b: Validate homeId — remove if entity not in house's occupants ---
   for (let i = 0; i < entities.length; i++) {
     const e = entities[i];
-    if (!e.homeId || isChild(e)) continue;
-    // Males don't live in houses
-    if (e.gender === 'male') {
-      const house = houses.find(h => h.id === e.homeId);
-      if (house && house.occupantId === e.id) house.occupantId = undefined;
-      entities[i] = { ...e, homeId: undefined };
-      continue;
-    }
-    // Female: only keep homeId if she is the occupant
+    if (!e.homeId) continue;
     const house = houses.find(h => h.id === e.homeId);
-    if (house && house.occupantId !== e.id) {
+    if (!house || !house.occupants.includes(e.id)) {
       entities[i] = { ...e, homeId: undefined };
     }
   }
@@ -792,12 +828,13 @@ export function tick(state: WorldState): WorldState {
     } else if (action === 'building') {
       for (const builder of finishing) {
         resolvedIds.add(builder.id);
-        if (isRoadTile(builder.position, biomes)) continue;
-        if (hasStructureAt(builder.position, houses, updatedVillages)) continue;
+        // builder.position is top-left corner of 3×3 house
+        if (!isValid3x3BuildSite(builder.position.x, builder.position.y, biomes, gridSize, houses, updatedVillages)) continue;
         const newHouse: House = {
           id: generateId('h'),
           position: { ...builder.position },
           tribe: builder.tribe,
+          occupants: [],
         };
         houses.push(newHouse);
         logEvent(builder, 'build_done', { detail: 'built a house' });
@@ -832,6 +869,14 @@ export function tick(state: WorldState): WorldState {
         }
         resolvedIds.add(gatherer.id);
       }
+    }
+  }
+
+  // Clean up house occupants for dead entities
+  for (const deadId of deadIds) {
+    for (const h of houses) {
+      const idx = h.occupants.indexOf(deadId);
+      if (idx >= 0) h.occupants.splice(idx, 1);
     }
   }
 
@@ -1048,7 +1093,7 @@ export function tick(state: WorldState): WorldState {
             } else if (goalType === 'build') {
               const v = getVillage(entity.tribe);
               if (v && v.woodStore >= HOUSE_WOOD_COST
-                  && !hasStructureAt(entity.position, houses, updatedVillages)) {
+                  && isValid3x3BuildSite(entity.position.x, entity.position.y, biomes, gridSize, houses, updatedVillages)) {
                 v.woodStore -= HOUSE_WOOD_COST;
                 entity = { ...entity, state: 'building' as const, stateTimer: BUILDING_DURATION, goal: undefined };
                 entities[idx] = entity;
@@ -1225,14 +1270,14 @@ export function tick(state: WorldState): WorldState {
   // --- Step 7: Pheromone mating (every tick, not just night) ---
   entities = pheromoneMating(entities, updatedVillages, log, tickNum);
 
-  // --- Step 7b: Homeless females claim free houses ---
+  // --- Step 7b: Homeless adults claim house slots ---
   for (let i = 0; i < entities.length; i++) {
     const e = entities[i];
-    if (e.gender !== 'female' || isChild(e) || e.homeId) continue;
-    const freeHouse = houses.find(h => h.tribe === e.tribe && !h.occupantId);
-    if (freeHouse) {
-      freeHouse.occupantId = e.id;
-      entities[i] = { ...e, homeId: freeHouse.id };
+    if (isChild(e) || e.homeId) continue;
+    const house = houses.find(h => h.tribe === e.tribe && h.occupants.length < HOUSE_CAPACITY);
+    if (house) {
+      house.occupants.push(e.id);
+      entities[i] = { ...e, homeId: house.id };
     }
   }
 

@@ -21,13 +21,17 @@ const biomeLabels: Record<string, string> = {
 export function TilePanel({ tile, world, onSelectEntity, onClose }: TilePanelProps) {
   const biome = world.biomes[tile.y]?.[tile.x] ?? 'unknown';
   const stockpileVillage = world.villages.find(v => v.stockpile?.x === tile.x && v.stockpile?.y === tile.y);
-  const house = world.houses.find(h => h.position.x === tile.x && h.position.y === tile.y);
+  const house = world.houses.find(h => {
+    const dx = tile.x - h.position.x;
+    const dy = tile.y - h.position.y;
+    return dx >= 0 && dx < 3 && dy >= 0 && dy < 3;
+  });
   const fruitTree = world.trees.find(t => t.fruiting && t.position.x === tile.x && t.position.y === tile.y);
   const animal = world.animals.find(a => a.position.x === tile.x && a.position.y === tile.y);
   const entities = world.entities.filter(e => e.position.x === tile.x && e.position.y === tile.y);
 
   const village = house ? world.villages.find(v => v.tribe === house.tribe) : undefined;
-  const occupant = house?.occupantId ? world.entities.find(e => e.id === house.occupantId) : undefined;
+  const occupants = house ? world.entities.filter(e => house.occupants.includes(e.id)) : [];
 
   return (
     <div style={panelStyle}>
@@ -63,8 +67,8 @@ export function TilePanel({ tile, world, onSelectEntity, onClose }: TilePanelPro
             </span>
           </div>
           <div style={{ fontSize: '10px', color: '#666', marginLeft: '8px' }}>
-            {occupant
-              ? `Occupant: ${occupant.gender === 'male' ? 'Male' : 'Female'} ${occupant.id}`
+            {occupants.length > 0
+              ? `Occupants: ${occupants.length}/${6}`
               : 'Empty'}
           </div>
         </div>
