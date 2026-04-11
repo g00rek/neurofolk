@@ -271,6 +271,32 @@ export function SlashIconsPage() {
             <div style={{ fontSize: 10, color: '#888', marginTop: 2 }}>red v3</div>
           </div>
         </div>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 12 }}>
+          <div style={{ textAlign: 'center' }}>
+            <CompositeSprite cols={3} tiles={[
+              { src: STRUCTURES, sx: 40, sy: 56 }, { src: STRUCTURES, sx: 48, sy: 56 }, { src: STRUCTURES, sx: 56, sy: 56 },
+              { src: STRUCTURES, sx: 40, sy: 64 }, { src: STRUCTURES, sx: 48, sy: 64 }, { src: STRUCTURES, sx: 56, sy: 64 },
+              { src: STRUCTURES, sx: 56, sy: 280 }, { src: STRUCTURES, sx: 0, sy: 360 }, { src: STRUCTURES, sx: 72, sy: 280 },
+            ]} />
+            <div style={{ fontSize: 10, color: '#888', marginTop: 2 }}>green v1</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <CompositeSprite cols={3} tiles={[
+              { src: STRUCTURES, sx: 104, sy: 56 }, { src: STRUCTURES, sx: 112, sy: 56 }, { src: STRUCTURES, sx: 120, sy: 56 },
+              { src: STRUCTURES, sx: 104, sy: 64 }, { src: STRUCTURES, sx: 112, sy: 64 }, { src: STRUCTURES, sx: 120, sy: 64 },
+              { src: STRUCTURES, sx: 56, sy: 280 }, { src: STRUCTURES, sx: 0, sy: 360 }, { src: STRUCTURES, sx: 72, sy: 280 },
+            ]} />
+            <div style={{ fontSize: 10, color: '#888', marginTop: 2 }}>green v2</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <CompositeSprite cols={3} tiles={[
+              { src: STRUCTURES, sx: 168, sy: 56 }, { src: STRUCTURES, sx: 176, sy: 56 }, { src: STRUCTURES, sx: 184, sy: 56 },
+              { src: STRUCTURES, sx: 168, sy: 64 }, { src: STRUCTURES, sx: 176, sy: 64 }, { src: STRUCTURES, sx: 184, sy: 64 },
+              { src: STRUCTURES, sx: 56, sy: 280 }, { src: STRUCTURES, sx: 0, sy: 360 }, { src: STRUCTURES, sx: 72, sy: 280 },
+            ]} />
+            <div style={{ fontSize: 10, color: '#888', marginTop: 2 }}>green v3</div>
+          </div>
+        </div>
       </section>
 
       {/* ── Trees & Nature ── */}
