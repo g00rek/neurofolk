@@ -71,9 +71,9 @@ export function drawGrassLayer(
         }
       }
       if (nearWater) continue;
-      const px = Math.floor(x * cellSize);
-      const py = Math.floor(y * cellSize);
-      const s = Math.round(cellSize);
+      const s = Math.round(cellSize * 0.6);
+      const px = Math.floor(x * cellSize + (cellSize - s) / 2);
+      const py = Math.floor(y * cellSize + (cellSize - s) / 2);
       ctx.drawImage(overworld, GRASS_FOOD.sx, GRASS_FOOD.sy, 8, 8, px, py, s, s);
     }
   }
