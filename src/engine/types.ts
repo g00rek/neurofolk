@@ -70,7 +70,7 @@ export interface Entity {
   goalSetTick: number;
 }
 
-export const MEAT_PORTIONS_PER_HUNT = 60;
+export const MEAT_PORTIONS_PER_HUNT = 120; // one kill feeds village for a while
 
 // Traits
 export const TRAIT_ENERGY_COST = 0.15; // extra energy drain per total trait points above baseline
