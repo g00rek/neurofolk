@@ -1159,41 +1159,42 @@ export function tick(state: WorldState): WorldState {
           }
         }
       }
-      // Find nearest herd member (any other animal)
-      let nearestHerd: Animal | undefined;
-      let nearestHerdDist = Infinity;
+      // Compute herd center of mass (all other animals)
+      let herdCx = 0, herdCy = 0, herdCount = 0;
       for (const other of animals) {
         if (other.id === a.id) continue;
-        const d = manhattan(a.position, other.position);
-        if (d > 0 && d < nearestHerdDist) {
-          nearestHerdDist = d;
-          nearestHerd = other;
-        }
+        herdCx += other.position.x;
+        herdCy += other.position.y;
+        herdCount++;
+      }
+      let herdCenter: Position | undefined;
+      let herdDist = 0;
+      if (herdCount > 0) {
+        herdCenter = { x: Math.round(herdCx / herdCount), y: Math.round(herdCy / herdCount) };
+        herdDist = manhattan(a.position, herdCenter);
       }
 
-      const roll = Math.random();
-      if (nearestGrass && a.energy < 70 && roll < 0.2) {
-        // Hungry — seek grass (~20% of ticks when energy < 70)
+      if (nearestGrass && a.energy < 70) {
+        // Hungry — always seek grass
         newPos = stepToward(a.position, nearestGrass, biomes, gridSize, houseTiles);
-      } else if (a.reproTimer === 0 && a.energy >= ANIMAL_REPRO_MIN_ENERGY && roll < 0.35) {
-        // Seek mate — opposite gender within range 8
+      } else if (a.reproTimer === 0 && a.energy >= ANIMAL_REPRO_MIN_ENERGY && Math.random() < 0.3) {
+        // Seek mate
         const oppositeGender = a.gender === 'male' ? 'female' : 'male';
         let nearestMate: Animal | undefined;
         for (const other of animals) {
           if (other.id === a.id || other.gender !== oppositeGender) continue;
           const d = manhattan(a.position, other.position);
-          if (d > 0 && d <= 8 && (!nearestMate || d < manhattan(a.position, nearestMate.position))) {
+          if (d > 0 && d <= 10 && (!nearestMate || d < manhattan(a.position, nearestMate.position))) {
             nearestMate = other;
           }
         }
         newPos = nearestMate
           ? stepToward(a.position, nearestMate.position, biomes, gridSize, houseTiles)
           : a.position;
-      } else if (nearestHerd && nearestHerdDist > 3 && roll < 0.6) {
-        // Herding — move toward nearest animal if far (~25% of ticks)
-        newPos = stepToward(a.position, nearestHerd.position, biomes, gridSize, houseTiles);
+      } else if (herdCenter && herdDist > 4 && Math.random() < 0.6) {
+        // Herding — move toward center of mass of all animals
+        newPos = stepToward(a.position, herdCenter, biomes, gridSize, houseTiles);
       } else {
-        // Idle — stay put
         newPos = a.position;
       }
     }
