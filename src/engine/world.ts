@@ -492,64 +492,63 @@ export function createWorld(options: CreateWorldOptions): WorldState {
 
 function detectInteractions(
   entities: Entity[],
-  gridSize: number,
+  _gridSize: number,
   skipIds: Set<string>,
   _villages: Village[],
   houses: House[] = [],
   log?: LogEntry[],
   tickNum?: number,
 ): Entity[] {
-  const tileGroups = new Map<number, Entity[]>();
-  for (const e of entities) {
-    if (isAtHome(e, houses)) continue;
-    const key = e.position.y * gridSize + e.position.x;
-    const group = tileGroups.get(key) ?? [];
-    group.push(e);
-    tileGroups.set(key, group);
-  }
-
   const newActionIds = new Set<string>();
 
-  for (const [, group] of tileGroups) {
-    const idleMales = group.filter(e => e.gender === 'male' && e.state === 'idle' && !skipIds.has(e.id));
+  // Find idle adult males not at home
+  const activeMales = entities.filter(e =>
+    e.gender === 'male' && e.state === 'idle' && !skipIds.has(e.id)
+    && ageInYears(e) >= FIGHT_MIN_AGE && !isAtHome(e, houses)
+  );
 
-    const fightableMales = idleMales.filter(e => ageInYears(e) >= FIGHT_MIN_AGE);
-    let fightStarted = false;
-    if (fightableMales.length >= 2) {
-      for (let i = 0; i < fightableMales.length - 1 && !fightStarted; i++) {
-        for (let j = i + 1; j < fightableMales.length && !fightStarted; j++) {
-          const m1 = fightableMales[i];
-          const m2 = fightableMales[j];
-          if (m1.tribe !== m2.tribe) {
-            if (Math.random() < m1.traits.aggression / 10 && Math.random() < m2.traits.aggression / 10) {
-              newActionIds.add(m1.id);
-              newActionIds.add(m2.id);
-              fightStarted = true;
-            }
+  // Check pairs within manhattan distance 1 (adjacent or same tile)
+  let fightStarted = false;
+    for (let i = 0; i < activeMales.length - 1 && !fightStarted; i++) {
+      for (let j = i + 1; j < activeMales.length && !fightStarted; j++) {
+        const m1 = activeMales[i];
+        const m2 = activeMales[j];
+        if (manhattan(m1.position, m2.position) > 1) continue;
+        if (m1.tribe !== m2.tribe) {
+          if (Math.random() < m1.traits.aggression / 10 && Math.random() < m2.traits.aggression / 10) {
+            newActionIds.add(m1.id);
+            newActionIds.add(m2.id);
+            fightStarted = true;
           }
         }
       }
     }
 
-    // Same-tribe training — only when truly idle near settlement
+    // Same-tribe training — adjacent males near settlement
     if (!fightStarted) {
-      const trulyIdle = fightableMales.filter(e => {
-        if (newActionIds.has(e.id)) return false;
-        return isNearTribeHouses(e.position, e.tribe, houses);
-      });
-      if (trulyIdle.length >= 2 && trulyIdle[0].tribe === trulyIdle[1].tribe) {
-        newActionIds.add(trulyIdle[0].id);
-        newActionIds.add(trulyIdle[1].id);
+      const trulyIdle = activeMales.filter(e =>
+        !newActionIds.has(e.id) && isNearTribeHouses(e.position, e.tribe, houses)
+      );
+      for (let i = 0; i < trulyIdle.length - 1; i++) {
+        for (let j = i + 1; j < trulyIdle.length; j++) {
+          if (trulyIdle[i].tribe === trulyIdle[j].tribe
+            && manhattan(trulyIdle[i].position, trulyIdle[j].position) <= 1) {
+            newActionIds.add(trulyIdle[i].id);
+            newActionIds.add(trulyIdle[j].id);
+            break;
+          }
+        }
+        if (newActionIds.size > 0) break;
       }
     }
-  }
 
   const loggedPairs = new Set<string>();
   return entities.map(e => {
     if (!newActionIds.has(e.id)) return e;
-    const key = e.position.y * gridSize + e.position.x;
-    const group = tileGroups.get(key)!;
-    const otherMale = group.find(o => o.id !== e.id && o.gender === 'male' && newActionIds.has(o.id));
+    const otherMale = entities.find(o =>
+      o.id !== e.id && o.gender === 'male' && newActionIds.has(o.id)
+      && manhattan(e.position, o.position) <= 1
+    );
     if (e.gender === 'male' && otherMale) {
       if (otherMale.tribe === e.tribe) {
         if (log && tickNum != null) {
@@ -1020,7 +1019,7 @@ export function tick(state: WorldState): WorldState {
         // Non-goal action (rest, play, wander) — execute once
         if (action.type === 'play') {
           const playTarget = randomStepBiome(entity.position, gridSize, biomes, houseTiles);
-          if (isNearTribeHouses(playTarget, entity.tribe, houses) && moveGrid[playTarget.y][playTarget.x] < 2) {
+          if (isNearTribeHouses(playTarget, entity.tribe, houses) && moveGrid[playTarget.y][playTarget.x] < 1) {
             moveGrid[entity.position.y][entity.position.x]--;
             moveGrid[playTarget.y][playTarget.x]++;
             entity = { ...entity, position: playTarget };
@@ -1028,7 +1027,7 @@ export function tick(state: WorldState): WorldState {
           }
         } else if (action.type === 'wander') {
           const wTarget = randomStepBiome(entity.position, gridSize, biomes, houseTiles);
-          if (moveGrid[wTarget.y][wTarget.x] < 2) {
+          if (moveGrid[wTarget.y][wTarget.x] < 1) {
             moveGrid[entity.position.y][entity.position.x]--;
             moveGrid[wTarget.y][wTarget.x]++;
             entity = { ...entity, position: wTarget };
@@ -1055,7 +1054,7 @@ export function tick(state: WorldState): WorldState {
           break;
         }
 
-        if (moveGrid[moveTarget.y][moveTarget.x] < 2) {
+        if (moveGrid[moveTarget.y][moveTarget.x] < 1) {
           moveGrid[entity.position.y][entity.position.x]--;
           moveGrid[moveTarget.y][moveTarget.x]++;
           entity = { ...entity, position: moveTarget };
@@ -1214,32 +1213,31 @@ export function tick(state: WorldState): WorldState {
     }
   }
 
-  // --- Step 5b: Reproduce animals (same tile, M+F, requires energy) ---
+  // --- Step 5b: Reproduce animals (adjacent tiles, M+F, requires energy) ---
   if (animals.length < animalMax) {
-    const animalTiles = new Map<number, Animal[]>();
-    for (const a of animals) {
-      const key = a.position.y * gridSize + a.position.x;
-      const group = animalTiles.get(key) ?? [];
-      group.push(a);
-      animalTiles.set(key, group);
-    }
+    const matedIds = new Set<string>();
     const babyAnimals: Animal[] = [];
-    for (const [, group] of animalTiles) {
-      const readyMales = group.filter(a => a.gender === 'male' && a.reproTimer === 0 && a.energy >= ANIMAL_REPRO_MIN_ENERGY);
-      const readyFemales = group.filter(a => a.gender === 'female' && a.reproTimer === 0 && a.energy >= ANIMAL_REPRO_MIN_ENERGY);
-      if (readyMales.length > 0 && readyFemales.length > 0 && animals.length + babyAnimals.length < animalMax) {
-        readyMales[0].reproTimer = ANIMAL_REPRO_INTERVAL;
-        readyFemales[0].reproTimer = ANIMAL_REPRO_INTERVAL;
-        const ns = neighbors(readyFemales[0].position, gridSize).filter(n => isPassable(biomes[n.y][n.x]));
-        if (ns.length === 0) continue;
-        babyAnimals.push({
-          id: generateId('a'),
-          position: ns[Math.floor(Math.random() * ns.length)],
-          gender: Math.random() < 0.5 ? 'male' : 'female',
-          energy: ANIMAL_ENERGY_START,
-          reproTimer: ANIMAL_REPRO_INTERVAL,
-        });
-      }
+    const readyFemales = animals.filter(a => a.gender === 'female' && a.reproTimer === 0 && a.energy >= ANIMAL_REPRO_MIN_ENERGY);
+    for (const female of readyFemales) {
+      if (matedIds.has(female.id) || animals.length + babyAnimals.length >= animalMax) break;
+      const mate = animals.find(a =>
+        a.gender === 'male' && a.reproTimer === 0 && a.energy >= ANIMAL_REPRO_MIN_ENERGY
+        && !matedIds.has(a.id) && manhattan(a.position, female.position) <= 1
+      );
+      if (!mate) continue;
+      matedIds.add(female.id);
+      matedIds.add(mate.id);
+      female.reproTimer = ANIMAL_REPRO_INTERVAL;
+      mate.reproTimer = ANIMAL_REPRO_INTERVAL;
+      const ns = neighbors(female.position, gridSize).filter(n => isPassable(biomes[n.y][n.x]));
+      if (ns.length === 0) continue;
+      babyAnimals.push({
+        id: generateId('a'),
+        position: ns[Math.floor(Math.random() * ns.length)],
+        gender: Math.random() < 0.5 ? 'male' : 'female',
+        energy: ANIMAL_ENERGY_START,
+        reproTimer: ANIMAL_REPRO_INTERVAL,
+      });
     }
     animals.push(...babyAnimals);
   }
