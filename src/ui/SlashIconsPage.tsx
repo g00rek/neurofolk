@@ -111,7 +111,7 @@ function MapSpritePreview({
 }
 
 // Animated house: static 3x3 tiles + animated chimney on top-right
-function AnimatedHouse({ roofSx = 40, roofSy, label }: { roofSx?: number; roofSy: number; label: string }) {
+function AnimatedHouse({ roofSx = 40, roofSy, chimneySy = 208, label }: { roofSx?: number; roofSy: number; chimneySy?: number; label: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scale = 6;
   const w = 3 * 8 * scale; // 144
@@ -138,14 +138,14 @@ function AnimatedHouse({ roofSx = 40, roofSy, label }: { roofSx?: number; roofSy
         const chimSx = 88 + frame * 8;
 
         // Row 0: chimney smoke (top) on right column
-        ctx.drawImage(img, chimSx, 208, 8, 8, 2 * s, 0, s, s);
+        ctx.drawImage(img, chimSx, chimneySy, 8, 8, 2 * s, 0, s, s);
 
         // Row 1: roof top row + chimney base on right
         ctx.drawImage(img, roofSx, roofSy, 8, 8, 0, s, s, s);
         ctx.drawImage(img, roofSx + 8, roofSy, 8, 8, s, s, s, s);
         ctx.drawImage(img, roofSx + 16, roofSy, 8, 8, 2 * s, s, s, s);
         // Draw chimney base on top of roof tile
-        ctx.drawImage(img, chimSx, 216, 8, 8, 2 * s, s, s, s);
+        ctx.drawImage(img, chimSx, chimneySy + 8, 8, 8, 2 * s, s, s, s);
 
         // Row 2: roof bottom row
         ctx.drawImage(img, roofSx, roofSy + 8, 8, 8, 0, 2 * s, s, s);
@@ -163,7 +163,7 @@ function AnimatedHouse({ roofSx = 40, roofSy, label }: { roofSx?: number; roofSy
     };
     img.src = STRUCTURES;
     return () => cancelAnimationFrame(raf);
-  }, [roofSx, roofSy]);
+  }, [roofSx, roofSy, chimneySy]);
 
   return (
     <div style={{ textAlign: 'center' }}>
@@ -267,9 +267,9 @@ export function SlashIconsPage() {
           <AnimatedHouse roofSx={168} roofSy={96} label="red v3" />
         </div>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 12 }}>
-          <AnimatedHouse roofSx={40} roofSy={56} label="green v1" />
-          <AnimatedHouse roofSx={104} roofSy={56} label="green v2" />
-          <AnimatedHouse roofSx={168} roofSy={56} label="green v3" />
+          <AnimatedHouse roofSx={40} roofSy={56} chimneySy={192} label="green v1" />
+          <AnimatedHouse roofSx={104} roofSy={56} chimneySy={192} label="green v2" />
+          <AnimatedHouse roofSx={168} roofSy={56} chimneySy={192} label="green v3" />
         </div>
       </section>
 
