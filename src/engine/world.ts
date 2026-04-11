@@ -1123,7 +1123,14 @@ export function tick(state: WorldState): WorldState {
   entities = detectInteractions(entities, gridSize, resolvedIds, updatedVillages, houses, log, tickNum);
 
   // --- Step 5: Move animals (AFTER humans so hunters can catch them) ---
-  animals = animals.map(a => {
+  // Build animal occupancy set — 1 animal per tile
+  const animalOccupied = new Set<string>();
+  for (const a of animals) animalOccupied.add(`${a.position.x},${a.position.y}`);
+  // Also block entity tiles
+  for (const e of entities) animalOccupied.add(`${e.position.x},${e.position.y}`);
+
+  for (let ai = 0; ai < animals.length; ai++) {
+    const a = animals[ai];
     let newPos: Position;
     let nearestHumanDist = ANIMAL_FLEE_RANGE + 1;
     let nearestHumanPos: Position | null = null;
@@ -1200,8 +1207,18 @@ export function tick(state: WorldState): WorldState {
         newPos = a.position;
       }
     }
-    return { ...a, position: newPos, reproTimer: Math.max(0, a.reproTimer - 1) };
-  });
+    // Only move if target tile is free
+    const newKey = `${newPos.x},${newPos.y}`;
+    const oldKey = `${a.position.x},${a.position.y}`;
+    if (newPos !== a.position && animalOccupied.has(newKey)) {
+      newPos = a.position; // blocked, stay
+    }
+    if (newPos !== a.position) {
+      animalOccupied.delete(oldKey);
+      animalOccupied.add(newKey);
+    }
+    animals[ai] = { ...a, position: newPos, reproTimer: Math.max(0, a.reproTimer - 1) };
+  }
 
   // --- Step 5a: Animals graze on grass ---
   for (let i = 0; i < animals.length; i++) {
