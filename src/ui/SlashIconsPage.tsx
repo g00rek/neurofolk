@@ -152,20 +152,20 @@ export function SlashIconsPage() {
       </section>
 
       <section style={sectionStyle}>
-        <h2 style={h2Style}>People Idle Animation (6 frames)</h2>
+        <h2 style={h2Style}>People Idle Animation (3 frames)</h2>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <SpriteAnimation src={UNITS} frames={[24,32,40,48,56,64].map(sx => ({ sx, sy: 32 }))} label="male red idle" />
-          <SpriteAnimation src={UNITS} frames={[24,32,40,48,56,64].map(sx => ({ sx, sy: 64 }))} label="male blue idle" />
-          <SpriteAnimation src={UNITS} frames={[24,32,40,48,56,64].map(sx => ({ sx, sy: 56 }))} label="male green idle" />
-          <SpriteAnimation src={UNITS} frames={[24,32,40,48,56,64].map(sx => ({ sx, sy: 96 }))} label="female red idle" />
-          <SpriteAnimation src={UNITS} frames={[24,32,40,48,56,64].map(sx => ({ sx, sy: 128 }))} label="female blue idle" />
-          <SpriteAnimation src={UNITS} frames={[24,32,40,48,56,64].map(sx => ({ sx, sy: 120 }))} label="female green idle" />
+          <SpriteAnimation src={UNITS} frames={[24,32,40].map(sx => ({ sx, sy: 32 }))} label="male red idle" />
+          <SpriteAnimation src={UNITS} frames={[24,32,40].map(sx => ({ sx, sy: 64 }))} label="male blue idle" />
+          <SpriteAnimation src={UNITS} frames={[24,32,40].map(sx => ({ sx, sy: 56 }))} label="male green idle" />
+          <SpriteAnimation src={UNITS} frames={[24,32,40].map(sx => ({ sx, sy: 96 }))} label="female red idle" />
+          <SpriteAnimation src={UNITS} frames={[24,32,40].map(sx => ({ sx, sy: 128 }))} label="female blue idle" />
+          <SpriteAnimation src={UNITS} frames={[24,32,40].map(sx => ({ sx, sy: 120 }))} label="female green idle" />
         </div>
         <div style={{ marginTop: 8, fontSize: 11, color: '#666' }}>
-          All 6 frames shown individually:
+          All 3 frames shown individually:
         </div>
         <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-          {[24,32,40,48,56,64].map(sx => (
+          {[24,32,40].map(sx => (
             <MapSpritePreview key={sx} src={UNITS} sx={sx} sy={32} sw={8} sh={8} wFrac={1} hFrac={1} />
           ))}
         </div>
