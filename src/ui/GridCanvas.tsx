@@ -29,6 +29,14 @@ interface SpriteAssets {
 }
 
 
+// Person animation frames per tribe row (sy)
+const PERSON_IDLE_SX = [24, 32, 40];
+const PERSON_WALK_SX = [152, 160, 168, 176];
+const PERSON_SY: Record<string, number> = {
+  'male-0': 32, 'male-1': 64, 'male-2': 56,
+  'female-0': 96, 'female-1': 128, 'female-2': 120,
+};
+
 const TRIBE_COLORS: Record<number, [number, number, number]> = {
   0: [220, 60, 60],   // Red
   1: [60, 100, 220],  // Blue
@@ -60,35 +68,35 @@ function drawPersonSprite(
   gender: string,
   tribe: number,
   isChild: boolean,
-  tileX: number,
-  tileY: number,
+  frameIdx: number,
+  moving: boolean,
+  facingLeft: boolean,
 ) {
-  const maleFrames = [{ sx: 0, sy: 32 }, { sx: 0, sy: 64 }, { sx: 0, sy: 56 }];
-  const femaleFrames = [{ sx: 0, sy: 96 }, { sx: 0, sy: 128 }, { sx: 8, sy: 120 }];
-  const frame = gender === 'male'
-    ? maleFrames[Math.max(0, Math.min(2, tribe))]
-    : femaleFrames[Math.max(0, Math.min(2, tribe))];
-  const srcSize = 8;
+  const sy = PERSON_SY[`${gender}-${Math.max(0, Math.min(2, tribe))}`] ?? 32;
+  const sxArr = moving ? PERSON_WALK_SX : PERSON_IDLE_SX;
+  const sx = sxArr[frameIdx % sxArr.length];
+
   const renderScale = isChild ? 0.68 : 0.82;
   const dstSize = Math.max(8, cellSize * renderScale);
-  const rawDx = cx - dstSize / 2;
-  const rawDy = cy - dstSize / 2;
-  const tileLeft = tileX * cellSize;
-  const tileTop = tileY * cellSize;
-  const minDx = tileLeft;
-  const maxDx = tileLeft + cellSize - dstSize;
-  const minDy = tileTop;
-  const maxDy = tileTop + cellSize - dstSize;
-  const dx = Math.max(minDx, Math.min(maxDx, rawDx));
-  const dy = Math.max(minDy, Math.min(maxDy, rawDy));
+  const dx = Math.round(cx - dstSize / 2);
+  const dy = Math.round(cy - dstSize / 2);
 
+  // Shadow
   ctx.beginPath();
   ctx.ellipse(cx, cy + cellSize * 0.34, dstSize * 0.2, dstSize * 0.1, 0, 0, Math.PI * 2);
   ctx.fillStyle = 'rgba(0,0,0,0.26)';
   ctx.fill();
 
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(sprites.units, frame.sx, frame.sy, srcSize, srcSize, dx, dy, dstSize, dstSize);
+  if (facingLeft) {
+    ctx.save();
+    ctx.translate(cx, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(sprites.units, sx, sy, 8, 8, Math.round(-dstSize / 2), dy, dstSize, dstSize);
+    ctx.restore();
+  } else {
+    ctx.drawImage(sprites.units, sx, sy, 8, 8, dx, dy, dstSize, dstSize);
+  }
 }
 
 function drawHouseSprite(
@@ -439,6 +447,8 @@ export function GridCanvas({ world, size, selectedId, selectedTile, onClick }: G
       child: boolean;
       tileX: number;
       tileY: number;
+      moving: boolean;
+      facingLeft: boolean;
     }
     const draws: DrawData[] = [];
     const tileIcons: Array<{ cx: number; cy: number; kind: ActionBadge }> = [];
@@ -456,6 +466,8 @@ export function GridCanvas({ world, size, selectedId, selectedTile, onClick }: G
         const pos = lerpPos(prev, entity.position, t);
         const baseCx = pos.x * cellSize + cellSize / 2;
         const baseCy = pos.y * cellSize + cellSize / 2;
+        const moving = prev.x !== entity.position.x || prev.y !== entity.position.y;
+        const facingLeft = entity.position.x < prev.x;
 
         let cx = baseCx;
         let cy = baseCy;
@@ -481,6 +493,8 @@ export function GridCanvas({ world, size, selectedId, selectedTile, onClick }: G
           child: ageInYears(entity) < CHILD_AGE,
           tileX: entity.position.x,
           tileY: entity.position.y,
+          moving,
+          facingLeft,
         });
       }
 
@@ -502,8 +516,11 @@ export function GridCanvas({ world, size, selectedId, selectedTile, onClick }: G
     }
 
     // Draw person figures
-    for (const { cx, cy, gender, tribe, child, tileX, tileY } of draws) {
-      drawPersonSprite(ctx, sprites, cx, cy, cellSize, gender, tribe, child, tileX, tileY);
+    for (const d of draws) {
+      const personFrame = d.moving
+        ? Math.floor(frameCount / 10) % PERSON_WALK_SX.length   // walk: ~0.17s per frame
+        : Math.floor(frameCount / 40) % PERSON_IDLE_SX.length;  // idle: ~0.67s per frame
+      drawPersonSprite(ctx, sprites, d.cx, d.cy, cellSize, d.gender, d.tribe, d.child, personFrame, d.moving, d.facingLeft);
     }
 
     // Keep text defaults predictable for next draw passes
