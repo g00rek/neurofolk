@@ -373,6 +373,61 @@ export function buildAIContext(
   };
 }
 
+// --- Hysteresis re-evaluation ---
+
+const RE_EVAL_INTERVAL = 20;
+const HYSTERESIS_THRESHOLD = 0.3;
+
+export function scoreForGoalType(ctx: AIContext, goalType: string): number {
+  switch (goalType) {
+    case 'hunt': return scoreHunt(ctx);
+    case 'gather': return scoreGather(ctx);
+    case 'chop': return scoreChopFirewood(ctx);
+    case 'build': return scoreBuildHome(ctx);
+    case 'return_home': return scoreReturnHome(ctx);
+    default: return 0;
+  }
+}
+
+function actionToKey(action: AIAction): string {
+  switch (action.type) {
+    case 'go_hunt': return 'hunt';
+    case 'go_gather': return 'gather';
+    case 'go_chop': return 'chop';
+    case 'return_home': return 'return_home';
+    case 'play': return 'play';
+    case 'rest': return 'rest';
+    default: return 'rest';
+  }
+}
+
+export interface ReEvalResult {
+  interrupt: boolean;
+  newAction?: AIAction;
+}
+
+export function shouldReEvaluate(
+  ctx: AIContext,
+  currentGoalType: string,
+  goalSetTick: number,
+  currentTick: number,
+): ReEvalResult {
+  const elapsed = currentTick - goalSetTick;
+  if (elapsed < RE_EVAL_INTERVAL) return { interrupt: false };
+
+  const role = ROLES[ctx.entity.gender];
+  const currentScore = scoreForGoalType(ctx, currentGoalType) * (role.actions[currentGoalType] ?? 0);
+
+  const bestAction = decideAction(ctx);
+  const bestKey = actionToKey(bestAction);
+  const bestScore = scoreForGoalType(ctx, bestKey) * (role.actions[bestKey] ?? 0);
+
+  if (bestScore - currentScore > HYSTERESIS_THRESHOLD) {
+    return { interrupt: true, newAction: bestAction };
+  }
+  return { interrupt: false };
+}
+
 export function actionToGoal(action: AIAction, ctx: AIContext): EntityGoal | undefined {
   switch (action.type) {
     case 'go_hunt': return { type: 'hunt', target: action.target };

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildAIContext, decideAction, getScores, ROLES } from '../utility-ai';
+import { buildAIContext, decideAction, getScores, ROLES, scoreForGoalType, shouldReEvaluate } from '../utility-ai';
 import type { AIContext } from '../utility-ai';
 import type { Entity } from '../types';
 
@@ -282,5 +282,49 @@ describe('role-based scoring', () => {
     });
     const action = decideAction(ctx);
     expect(action.type).not.toBe('go_gather');
+  });
+});
+
+describe('hysteresis re-evaluation', () => {
+  it('does not re-evaluate before 20 ticks elapsed', () => {
+    const ctx = makeContext({
+      entity: makeEntity({ gender: 'male', energy: 15 }),
+    });
+    const result = shouldReEvaluate(ctx, 'chop', 25, 30);
+    expect(result.interrupt).toBe(false);
+  });
+
+  it('does not interrupt when score difference is below threshold', () => {
+    // Entity with high energy — survival score is 0, all scores similar
+    const ctx = makeContext({
+      entity: makeEntity({ gender: 'male', energy: 80 }),
+    });
+    const result = shouldReEvaluate(ctx, 'hunt', 0, 20);
+    // With high energy, no big score difference — should not interrupt
+    expect(result.interrupt).toBe(false);
+  });
+
+  it('interrupts when survival is critical and current action is low-priority', () => {
+    // Entity with very low energy — survival score = 1.0, chop score is low
+    // Use nearestAnimal so male's survival action is go_hunt (hunt is in male role)
+    const ctx = makeContext({
+      entity: makeEntity({ gender: 'male', energy: 10 }),
+      nearestAnimal: { pos: { x: 6, y: 5 }, dist: 1 },
+    });
+    const result = shouldReEvaluate(ctx, 'chop', 0, 20);
+    expect(result.interrupt).toBe(true);
+    expect(result.newAction).toBeDefined();
+  });
+
+  it('scoreForGoalType maps all goal types', () => {
+    const ctx = makeContext({
+      entity: makeEntity({ gender: 'male', energy: 80 }),
+    });
+    expect(typeof scoreForGoalType(ctx, 'hunt')).toBe('number');
+    expect(typeof scoreForGoalType(ctx, 'gather')).toBe('number');
+    expect(typeof scoreForGoalType(ctx, 'chop')).toBe('number');
+    expect(typeof scoreForGoalType(ctx, 'build')).toBe('number');
+    expect(typeof scoreForGoalType(ctx, 'return_home')).toBe('number');
+    expect(scoreForGoalType(ctx, 'unknown')).toBe(0);
   });
 });
