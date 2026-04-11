@@ -2,4 +2,9 @@ node_modules
 dist
 .superpowers/
 logs/
-output/\ndev.log\nMini-Medieval-v2.3.1.zip\n.claude/settings.local.json
+output/
+dev.log
+Mini-Medieval-v2.3.1.zip
+.claude/settings.local.json
+public/assets/mini-medieval/
+public/assets/external/
