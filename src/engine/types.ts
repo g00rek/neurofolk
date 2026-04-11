@@ -131,6 +131,7 @@ export interface House {
 }
 
 export const HOUSE_CAPACITY = 6;         // max people per house
+export const HOUSE_SIZE = 2;             // house footprint in tiles (2×2)
 
 // Population (gameplay-tuned)
 export const MIN_REPRODUCTIVE_AGE = 12;

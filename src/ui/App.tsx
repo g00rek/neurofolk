@@ -16,9 +16,9 @@ import { DEFAULT_BIOME_PARAMS } from '../engine/biomes';
 import type { BiomeGenParams } from '../engine/biomes';
 
 // One-time migration: clear stale localStorage from old grid sizes
-if (!localStorage.getItem('neurofolk-v2-migrated')) {
+if (!localStorage.getItem('neurofolk-v3-migrated')) {
   localStorage.removeItem('neurofolk-map-params');
-  localStorage.setItem('neurofolk-v2-migrated', '1');
+  localStorage.setItem('neurofolk-v3-migrated', '1');
 }
 
 function loadMapParams(): { gridSize: number; params: BiomeGenParams } {
@@ -27,12 +27,12 @@ function loadMapParams(): { gridSize: number; params: BiomeGenParams } {
     if (raw) {
       const saved = JSON.parse(raw);
       return {
-        gridSize: saved.gridSize ?? 10,
+        gridSize: saved.gridSize ?? 30,
         params: { ...DEFAULT_BIOME_PARAMS, ...saved.params },
       };
     }
   } catch { /* ignore */ }
-  return { gridSize: 10, params: { ...DEFAULT_BIOME_PARAMS } };
+  return { gridSize: 30, params: { ...DEFAULT_BIOME_PARAMS } };
 }
 
 const INITIAL_ENTITY_COUNT = 4;

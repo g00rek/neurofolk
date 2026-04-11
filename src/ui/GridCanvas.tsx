@@ -57,10 +57,12 @@ function entityColor(entity: Entity, villages: Village[]): string {
   return `rgb(${base[0]},${base[1]},${base[2]})`;
 }
 
+const HOUSE_RENDER_SIZE = 2; // tiles per house side
+
 function isInsideAnyHouse(entity: Entity, world: WorldState): boolean {
   for (const h of world.houses) {
-    if (entity.position.x >= h.position.x && entity.position.x < h.position.x + 3
-      && entity.position.y >= h.position.y && entity.position.y < h.position.y + 3) {
+    if (entity.position.x >= h.position.x && entity.position.x < h.position.x + HOUSE_RENDER_SIZE
+      && entity.position.y >= h.position.y && entity.position.y < h.position.y + HOUSE_RENDER_SIZE) {
       return true;
     }
   }
@@ -116,38 +118,40 @@ function drawHouseSprite(
   tribe: number,
   frameIdx: number,
 ) {
-  // Roof Y by tribe: 0=red(96), 1=blue — not used, 2=green(56)
+  // Roof Y by tribe: 0=red(96), 2=green(56)
   const roofSy = tribe === 2 ? 56 : 96;
-  // Roof X variants: 40, 104, 168 — pick by position hash
   const roofVariants = [40, 104, 168];
   const roofSx = roofVariants[Math.floor(((x * 7 + y * 13) & 0x7fffffff) % 3)];
-  // Chimney Y by tribe
   const chimneySy = tribe === 2 ? 192 : 208;
   const chimSx = 88 + (frameIdx % 6) * 8;
 
-  const s = Math.round(cellSize);
+  // Draw 3×3 tile pattern (24×24 source) into 2×2 cell area
+  const dstW = Math.round(cellSize * 2);
+  const t = dstW / 3; // size of each "tile" in destination
   ctx.imageSmoothingEnabled = false;
 
-  // Row 0: chimney smoke above roof (right column)
-  const chimOff = Math.round(s * 0.5);
-  ctx.drawImage(sprites.structures, chimSx, chimneySy, 8, 8, Math.round(x + 2 * s), Math.round(y - chimOff), s, s);
+  // Chimney smoke above roof
+  const chimOff = Math.round(t * 0.5);
+  ctx.drawImage(sprites.structures, chimSx, chimneySy, 8, 8,
+    Math.round(x + 2 * t), Math.round(y - chimOff), Math.round(t), Math.round(t));
 
   // Row 1: roof top
-  ctx.drawImage(sprites.structures, roofSx, roofSy, 8, 8, Math.round(x), Math.round(y), s, s);
-  ctx.drawImage(sprites.structures, roofSx + 8, roofSy, 8, 8, Math.round(x + s), Math.round(y), s, s);
-  ctx.drawImage(sprites.structures, roofSx + 16, roofSy, 8, 8, Math.round(x + 2 * s), Math.round(y), s, s);
-  // Chimney base on top of right roof tile
-  ctx.drawImage(sprites.structures, chimSx, chimneySy + 8, 8, 8, Math.round(x + 2 * s), Math.round(y), s, s);
+  ctx.drawImage(sprites.structures, roofSx, roofSy, 8, 8, Math.round(x), Math.round(y), Math.round(t), Math.round(t));
+  ctx.drawImage(sprites.structures, roofSx + 8, roofSy, 8, 8, Math.round(x + t), Math.round(y), Math.round(t), Math.round(t));
+  ctx.drawImage(sprites.structures, roofSx + 16, roofSy, 8, 8, Math.round(x + 2 * t), Math.round(y), Math.round(t), Math.round(t));
+  // Chimney base
+  ctx.drawImage(sprites.structures, chimSx, chimneySy + 8, 8, 8,
+    Math.round(x + 2 * t), Math.round(y), Math.round(t), Math.round(t));
 
   // Row 2: roof bottom
-  ctx.drawImage(sprites.structures, roofSx, roofSy + 8, 8, 8, Math.round(x), Math.round(y + s), s, s);
-  ctx.drawImage(sprites.structures, roofSx + 8, roofSy + 8, 8, 8, Math.round(x + s), Math.round(y + s), s, s);
-  ctx.drawImage(sprites.structures, roofSx + 16, roofSy + 8, 8, 8, Math.round(x + 2 * s), Math.round(y + s), s, s);
+  ctx.drawImage(sprites.structures, roofSx, roofSy + 8, 8, 8, Math.round(x), Math.round(y + t), Math.round(t), Math.round(t));
+  ctx.drawImage(sprites.structures, roofSx + 8, roofSy + 8, 8, 8, Math.round(x + t), Math.round(y + t), Math.round(t), Math.round(t));
+  ctx.drawImage(sprites.structures, roofSx + 16, roofSy + 8, 8, 8, Math.round(x + 2 * t), Math.round(y + t), Math.round(t), Math.round(t));
 
-  // Row 3: walls (wood + door + wood)
-  ctx.drawImage(sprites.structures, 56, 280, 8, 8, Math.round(x), Math.round(y + 2 * s), s, s);
-  ctx.drawImage(sprites.structures, 0, 360, 8, 8, Math.round(x + s), Math.round(y + 2 * s), s, s);
-  ctx.drawImage(sprites.structures, 72, 280, 8, 8, Math.round(x + 2 * s), Math.round(y + 2 * s), s, s);
+  // Row 3: walls
+  ctx.drawImage(sprites.structures, 56, 280, 8, 8, Math.round(x), Math.round(y + 2 * t), Math.round(t), Math.round(t));
+  ctx.drawImage(sprites.structures, 0, 360, 8, 8, Math.round(x + t), Math.round(y + 2 * t), Math.round(t), Math.round(t));
+  ctx.drawImage(sprites.structures, 72, 280, 8, 8, Math.round(x + 2 * t), Math.round(y + 2 * t), Math.round(t), Math.round(t));
 }
 
 function drawStockpileSprite(

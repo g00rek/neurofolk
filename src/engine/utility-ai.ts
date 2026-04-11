@@ -9,6 +9,7 @@ import {
   NEAR_HOME_RANGE,
   HOUSE_CAPACITY,
   HOUSE_WOOD_COST,
+  HOUSE_SIZE,
 } from './types';
 import { ageInYears, isValid3x3BuildSite } from './world';
 
@@ -264,7 +265,7 @@ export function buildAIContext(
 
   // nearHome: within NEAR_HOME_RANGE of any tribe house center
   const tribeHouses = houses.filter(h => h.tribe === entity.tribe);
-  const houseCenter = (h: { position: Position }) => ({ x: h.position.x + 1, y: h.position.y + 1 });
+  const houseCenter = (h: { position: Position }) => ({ x: h.position.x + Math.floor(HOUSE_SIZE / 2), y: h.position.y + Math.floor(HOUSE_SIZE / 2) });
   const nearHome = tribeHouses.some(h =>
     manhattan(entity.position, houseCenter(h)) <= NEAR_HOME_RANGE + 1
   );
@@ -338,7 +339,7 @@ export function buildAIContext(
   let nearestBuildSite: AIContext['nearestBuildSite'];
   if (villageNeedsHouses && village) {
     // Anchor tiles: existing tribe houses (center) or stockpile
-    const anchors: Position[] = tribeHouses.map(h => ({ x: h.position.x + 1, y: h.position.y + 1 }));
+    const anchors: Position[] = tribeHouses.map(h => ({ x: h.position.x + Math.floor(HOUSE_SIZE / 2), y: h.position.y + Math.floor(HOUSE_SIZE / 2) }));
     if (anchors.length === 0 && village.stockpile) anchors.push(village.stockpile);
 
     // Search within distance 8 of anchors for valid 3×3 build sites
@@ -350,7 +351,7 @@ export function buildAIContext(
           const key = `${nx},${ny}`;
           if (checked.has(key)) continue;
           checked.add(key);
-          if (nx < 0 || nx >= gridSize - 2 || ny < 0 || ny >= gridSize - 2) continue;
+          if (nx < 0 || nx >= gridSize - HOUSE_SIZE + 1 || ny < 0 || ny >= gridSize - HOUSE_SIZE + 1) continue;
           if (!isValid3x3BuildSite(nx, ny, biomes, gridSize, houses, villages)) continue;
           const d = Math.abs(nx - entity.position.x) + Math.abs(ny - entity.position.y);
           if (!nearestBuildSite || d < nearestBuildSite.dist) {

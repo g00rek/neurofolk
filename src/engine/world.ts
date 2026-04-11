@@ -8,7 +8,7 @@ import {
   FIGHT_MIN_AGE, MEAT_PORTIONS_PER_HUNT, TREE_FRUIT_PORTIONS,
   ANIMAL_REPRO_INTERVAL, ANIMAL_MAX, ANIMAL_HUNT_MIN_POPULATION, ANIMAL_FLEE_RANGE, FOREST_SPEED_PENALTY,
   WOOD_PER_CHOP, WINTER_COLD_DAMAGE, NEAR_HOME_RANGE,
-  CHOPPING_DURATION, BUILDING_DURATION, HUNT_KILL_RANGE, HOUSE_WOOD_COST, HOUSE_CAPACITY,
+  CHOPPING_DURATION, BUILDING_DURATION, HUNT_KILL_RANGE, HOUSE_WOOD_COST, HOUSE_CAPACITY, HOUSE_SIZE,
   ANIMAL_ENERGY_MAX, ANIMAL_ENERGY_START, ANIMAL_ENERGY_GRAZE, ANIMAL_ENERGY_DRAIN,
   ANIMAL_DRAIN_INTERVAL, ANIMAL_REPRO_MIN_ENERGY, GRASS_GROW_CHANCE, GRASS_MAX_PER_TILE,
 } from './types';
@@ -61,18 +61,18 @@ function homePosition(e: Entity, houses: House[]): Position | undefined {
   if (!e.homeId) return undefined;
   const h = houses.find(h => h.id === e.homeId);
   if (!h) return undefined;
-  // Return center of 3×3 house
-  return { x: h.position.x + 1, y: h.position.y + 1 };
+  // Return center of house
+  const off = Math.floor(HOUSE_SIZE / 2);
+  return { x: h.position.x + off, y: h.position.y + off };
 }
 
 function isAtHome(e: Entity, houses: House[]): boolean {
   if (!e.homeId) return false;
   const house = houses.find(h => h.id === e.homeId);
   if (!house) return false;
-  // Entity is "at home" if within the 3×3 area
   const dx = e.position.x - house.position.x;
   const dy = e.position.y - house.position.y;
-  return dx >= 0 && dx < 3 && dy >= 0 && dy < 3;
+  return dx >= 0 && dx < HOUSE_SIZE && dy >= 0 && dy < HOUSE_SIZE;
 }
 
 function clamp(v: number, min: number, max: number): number {
@@ -235,7 +235,8 @@ function randomPos(gridSize: number): Position {
 }
 
 function houseCenterPos(h: House): Position {
-  return { x: h.position.x + 1, y: h.position.y + 1 };
+  const off = Math.floor(HOUSE_SIZE / 2);
+  return { x: h.position.x + off, y: h.position.y + off };
 }
 
 function isNearTribeHouses(pos: Position, tribe: TribeId, houses: House[]): boolean {
@@ -243,34 +244,36 @@ function isNearTribeHouses(pos: Position, tribe: TribeId, houses: House[]): bool
 }
 
 
-/** Check if a 3×3 house can be placed at (x,y) as top-left corner */
+/** Check if a house can be placed at (x,y) as top-left corner */
 export function isValid3x3BuildSite(
   x: number, y: number,
   biomes: Biome[][], gridSize: number,
   houses: House[], villages: Village[],
 ): boolean {
-  // Check 3×3 area + 1-tile buffer (5×5 total)
-  for (let dy = -1; dy <= 3; dy++) {
-    for (let dx = -1; dx <= 3; dx++) {
+  const S = HOUSE_SIZE;
+  const gap = S + 1; // house size + 1 tile gap
+  // Check house area + 1-tile buffer
+  for (let dy = -1; dy <= S; dy++) {
+    for (let dx = -1; dx <= S; dx++) {
       const nx = x + dx, ny = y + dy;
       if (nx < 0 || nx >= gridSize || ny < 0 || ny >= gridSize) return false;
       const b = biomes[ny][nx];
-      // Inner 3×3 must be plains
-      if (dx >= 0 && dx < 3 && dy >= 0 && dy < 3) {
+      // Inner area must be plains
+      if (dx >= 0 && dx < S && dy >= 0 && dy < S) {
         if (b !== 'plains') return false;
       }
       // Buffer must not be water
       if (b === 'water') return false;
     }
   }
-  // At least 2 tiles from stockpile (distance between 3×3 top-left and stockpile)
+  // At least 2 tiles from stockpile
   for (const v of villages) {
     if (!v.stockpile) continue;
-    if (Math.abs(v.stockpile.x - x) < 4 && Math.abs(v.stockpile.y - y) < 4) return false;
+    if (Math.abs(v.stockpile.x - x) < S + 2 && Math.abs(v.stockpile.y - y) < S + 2) return false;
   }
-  // No overlap with existing houses (each house is 3×3, require 1-tile gap → distance >= 4)
+  // No overlap with existing houses (require 1-tile gap)
   for (const h of houses) {
-    if (Math.abs(h.position.x - x) < 4 && Math.abs(h.position.y - y) < 4) return false;
+    if (Math.abs(h.position.x - x) < gap && Math.abs(h.position.y - y) < gap) return false;
   }
   return true;
 }
@@ -294,8 +297,8 @@ function isValidMove(pos: Position, biomes: Biome[][], gridSize: number, houseTi
 function buildHouseTileSet(houses: House[]): Set<string> {
   const s = new Set<string>();
   for (const h of houses) {
-    for (let dy = 0; dy < 3; dy++)
-      for (let dx = 0; dx < 3; dx++)
+    for (let dy = 0; dy < HOUSE_SIZE; dy++)
+      for (let dx = 0; dx < HOUSE_SIZE; dx++)
         s.add(`${h.position.x + dx},${h.position.y + dy}`);
   }
   return s;
