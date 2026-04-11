@@ -1,7 +1,7 @@
 import { createWorld, tick } from './world';
 import { TICKS_PER_YEAR } from './types';
 
-const RUNS = 20;
+const RUNS = 50;
 const MAX_TICKS = 48000; // 20 years
 const GRID = 10;
 const ENTITIES = 4;

@@ -333,20 +333,11 @@ export function createWorld(options: CreateWorldOptions): WorldState {
     woodStore: scaled(10, gridSize, 5),
   }));
 
-  // Create initial road ring around each stockpile (8-neighborhood).
+  // Stockpile tile is plains (no road ring for now)
   for (const village of villages) {
     const center = village.stockpile;
     if (!center) continue;
     biomes[center.y][center.x] = 'plains';
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        if (dx === 0 && dy === 0) continue;
-        const nx = center.x + dx;
-        const ny = center.y + dy;
-        if (nx < 0 || nx >= gridSize || ny < 0 || ny >= gridSize) continue;
-        biomes[ny][nx] = 'road';
-      }
-    }
   }
 
   const entities: Entity[] = [];

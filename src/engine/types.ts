@@ -84,13 +84,13 @@ export interface Animal {
 }
 
 export const ANIMAL_ENERGY_MAX = 100;
-export const ANIMAL_ENERGY_START = 80;
-export const ANIMAL_ENERGY_GRAZE = 15;     // energy gained from eating grass
-export const ANIMAL_ENERGY_DRAIN = 1;      // energy lost per ANIMAL_DRAIN_INTERVAL ticks
-export const ANIMAL_DRAIN_INTERVAL = 30;   // drain energy every N ticks
-export const ANIMAL_REPRO_MIN_ENERGY = 50; // need this much energy to reproduce
-export const ANIMAL_REPRO_INTERVAL = 2400; // 1 year between reproduction per animal
-export const ANIMAL_MAX = 80;              // population cap
+export const ANIMAL_ENERGY_START = 60;
+export const ANIMAL_ENERGY_GRAZE = 12;     // energy gained from eating grass
+export const ANIMAL_ENERGY_DRAIN = 2;      // energy lost per ANIMAL_DRAIN_INTERVAL ticks
+export const ANIMAL_DRAIN_INTERVAL = 10;   // drain energy every N ticks (~2 per half-day)
+export const ANIMAL_REPRO_MIN_ENERGY = 70; // need plenty of energy to reproduce
+export const ANIMAL_REPRO_INTERVAL = 1200; // half year between reproduction
+export const ANIMAL_MAX = 999;             // no artificial cap — hunger regulates population
 export const ANIMAL_HUNT_MIN_POPULATION = 12;
 export const ANIMAL_FLEE_RANGE = 1;
 export const HUNT_KILL_RANGE = 3;
