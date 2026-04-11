@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import type { Tree } from '../engine/types';
+import type { Biome, Tree } from '../engine/types';
 import { generateBiomeGrid, DEFAULT_BIOME_PARAMS } from '../engine/biomes';
 import type { BiomeGenParams } from '../engine/biomes';
 import { drawTerrain } from './terrain/renderer';
@@ -8,8 +8,7 @@ import { drawTerrain } from './terrain/renderer';
 const MINI_MEDIEVAL_BASE = '/assets/mini-medieval/Mini-Medieval-8x8';
 const OVERWORLD_SHEET_URL = `${MINI_MEDIEVAL_BASE}/Overworld.png`;
 const ORES_SHEET_URL = `${MINI_MEDIEVAL_BASE}/Ores.png`;
-const DEFAULT_GRID_SIZE = 100;
-// cellSize computed dynamically to fill viewport
+const DEFAULT_GRID_SIZE = 10;
 
 const STORAGE_KEY = 'neurofolk-map-params';
 
@@ -33,6 +32,7 @@ function saveParams(gridSize: number, params: BiomeGenParams) {
 
 export function MapPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const initial = useRef(loadParams()).current;
   const [gridSize, setGridSize] = useState(initial.gridSize);
   const [params, setParams] = useState<BiomeGenParams>(initial.params);
@@ -41,7 +41,7 @@ export function MapPage() {
   const [oresSprite, setOresSprite] = useState<HTMLImageElement | null>(null);
   const [grassDensity, setGrassDensity] = useState(7);
   const [waveDensity, setWaveDensity] = useState(5);
-  const [vpSize, setVpSize] = useState(Math.min(window.innerWidth - 320, window.innerHeight - 100));
+  const [containerWidth, setContainerWidth] = useState(window.innerWidth - 32);
 
   const regenerate = () => {
     saveParams(gridSize, params);
@@ -58,13 +58,21 @@ export function MapPage() {
     return t;
   }, [biomes]);
 
+  // Track container width for full-width canvas
   useEffect(() => {
-    const onResize = () => setVpSize(Math.min(window.innerWidth - 320, window.innerHeight - 100));
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
-  const cellSize = Math.max(2, Math.floor(vpSize / biomes.length));
+  const cellSize = Math.max(2, Math.floor(containerWidth / biomes.length));
+  const canvasPx = cellSize * biomes.length;
 
   useEffect(() => {
     const img = new Image();
@@ -96,9 +104,9 @@ export function MapPage() {
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [biomes, sprite, cellSize, trees]);
+  }, [biomes, sprite, oresSprite, cellSize, trees, grassDensity, waveDensity]);
 
-  const updateParam = (key: keyof BiomeGenParams, value: number) => {
+  const updateParam = useCallback((key: keyof BiomeGenParams, value: number) => {
     setParams(prev => {
       const biomeKeys: (keyof BiomeGenParams)[] = ['waterPct', 'forestPct', 'mountainPct'];
       if (!biomeKeys.includes(key)) {
@@ -106,7 +114,6 @@ export function MapPage() {
         saveParams(gridSize, next);
         return next;
       }
-      // Linked sliders: sum always ≤ 100, others shrink proportionally
       const next = { ...prev, [key]: value };
       const others = biomeKeys.filter(k => k !== key);
       const otherSum = others.reduce((s, k) => s + (next[k] as number), 0);
@@ -120,7 +127,7 @@ export function MapPage() {
       saveParams(gridSize, next);
       return next;
     });
-  };
+  }, [gridSize]);
 
   const updateGridSize = (v: number) => {
     setGridSize(v);
@@ -129,37 +136,46 @@ export function MapPage() {
 
   return (
     <main style={pageStyle}>
-      <div style={toolbarStyle}>
-        <button style={buttonStyle} onClick={regenerate}>Regenerate</button>
+      {/* Full-width map */}
+      <div ref={containerRef} style={mapContainerStyle}>
+        <canvas
+          ref={canvasRef}
+          style={{ ...canvasStyle, width: canvasPx, height: canvasPx }}
+        />
       </div>
 
-      <div style={contentStyle}>
-        <canvas ref={canvasRef} style={{ ...canvasStyle, width: biomes.length * cellSize, height: biomes.length * cellSize }} />
-        <aside style={panelStyle}>
-          <h3 style={h3Style}>Generation Parameters</h3>
-          <ParamSlider label="Map size" value={gridSize} min={20} max={200} step={10}
-            onChange={v => updateGridSize(v)} />
-          <ParamSlider label="Water %" value={params.waterPct}
-            min={0} max={100} step={1}
-            onChange={v => updateParam('waterPct', v)} />
-          <ParamSlider label="Forest %" value={params.forestPct}
-            min={0} max={100} step={1}
-            onChange={v => updateParam('forestPct', v)} />
-          <ParamSlider label="Rocks %" value={params.mountainPct}
-            min={0} max={100} step={1}
-            onChange={v => updateParam('mountainPct', v)} />
-          <div style={{ fontSize: 12, color: '#9aa4bf', margin: '6px 0' }}>
-            Plains: {100 - params.waterPct - params.forestPct - params.mountainPct}%
+      {/* Controls below map */}
+      <section style={controlsStyle}>
+        <div style={controlsInnerStyle}>
+          <div style={controlsHeaderStyle}>
+            <h3 style={h3Style}>Generation Parameters</h3>
+            <button style={buttonStyle} onClick={regenerate}>Regenerate</button>
           </div>
-          <ParamSlider label="Grass detail %" value={grassDensity} min={0} max={100} step={1}
-            onChange={v => setGrassDensity(v)} />
-          <ParamSlider label="Wave density %" value={waveDensity} min={0} max={100} step={1}
-            onChange={v => setWaveDensity(v)} />
-          <div style={{ marginTop: 8, fontSize: 11, color: '#6b7a96' }}>
-            Change sliders then click Regenerate.
+
+          <div style={slidersGridStyle}>
+            <ParamSlider label="Map size" value={gridSize} min={5} max={200} step={5}
+              onChange={v => updateGridSize(v)} />
+            <ParamSlider label="Water %" value={params.waterPct}
+              min={0} max={100} step={1}
+              onChange={v => updateParam('waterPct', v)} />
+            <ParamSlider label="Forest %" value={params.forestPct}
+              min={0} max={100} step={1}
+              onChange={v => updateParam('forestPct', v)} />
+            <ParamSlider label="Rocks %" value={params.mountainPct}
+              min={0} max={100} step={1}
+              onChange={v => updateParam('mountainPct', v)} />
+            <ParamSlider label="Grass detail" value={grassDensity} min={0} max={100} step={1}
+              onChange={v => setGrassDensity(v)} />
+            <ParamSlider label="Wave density" value={waveDensity} min={0} max={100} step={1}
+              onChange={v => setWaveDensity(v)} />
           </div>
-        </aside>
-      </div>
+
+          <div style={infoRowStyle}>
+            <span>Plains: {100 - params.waterPct - params.forestPct - params.mountainPct}%</span>
+            <span style={{ color: '#6b7a96' }}>Change sliders then click Regenerate. Settings apply to new games.</span>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }
@@ -170,7 +186,7 @@ function ParamSlider({ label, value, min, max, step, onChange }: {
 }) {
   return (
     <div style={sliderRow}>
-      <span style={{ width: 90 }}>{label}</span>
+      <span style={{ width: 100 }}>{label}</span>
       <input type="range" min={min} max={max} step={step} value={value}
         onChange={e => onChange(Number(e.target.value))} style={{ flex: 1 }} />
       <code style={{ width: 40, textAlign: 'right' }}>{value}</code>
@@ -178,14 +194,80 @@ function ParamSlider({ label, value, min, max, step, onChange }: {
   );
 }
 
-const pageStyle: CSSProperties = { minHeight: '100vh', background: '#12141c', color: '#d8deea', padding: 16, fontFamily: 'system-ui, -apple-system, sans-serif' };
-const toolbarStyle: CSSProperties = { display: 'flex', alignItems: 'center', gap: 14, marginBottom: 10 };
-const contentStyle: CSSProperties = { display: 'flex', alignItems: 'flex-start', gap: 14 };
-const canvasStyle: CSSProperties = { border: '1px solid #2d3346', borderRadius: 8, imageRendering: 'pixelated', background: '#1b1f2b' };
-const panelStyle: CSSProperties = { minWidth: 280, border: '1px solid #2d3346', borderRadius: 8, padding: 12, background: '#161a26' };
-const h3Style: CSSProperties = { margin: '0 0 10px', fontSize: 14 };
-const sliderRow: CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, marginBottom: 6 };
-const buttonStyle: CSSProperties = { background: '#89bf5d', color: '#0f1520', border: 'none', borderRadius: 6, padding: '6px 10px', fontWeight: 700, cursor: 'pointer' };
-const labelStyle: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 };
-const linkStyle: CSSProperties = { color: '#8cb4ff', textDecoration: 'none', fontSize: 13 };
-const selectStyle: CSSProperties = { background: '#1a2234', color: '#d8deea', border: '1px solid #33405e', borderRadius: 6, padding: '4px 6px' };
+// ── Styles ──────────────────────────────────────────────────────────────
+
+const pageStyle: CSSProperties = {
+  minHeight: '100vh',
+  background: '#12141c',
+  color: '#d8deea',
+  padding: 16,
+  fontFamily: 'system-ui, -apple-system, sans-serif',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 16,
+};
+
+const mapContainerStyle: CSSProperties = {
+  width: '100%',
+  overflow: 'hidden',
+};
+
+const canvasStyle: CSSProperties = {
+  display: 'block',
+  borderRadius: 8,
+  imageRendering: 'pixelated',
+  background: '#1b1f2b',
+};
+
+const controlsStyle: CSSProperties = {
+  width: '100%',
+};
+
+const controlsInnerStyle: CSSProperties = {
+  border: '1px solid #2d3346',
+  borderRadius: 8,
+  padding: 16,
+  background: '#161a26',
+};
+
+const controlsHeaderStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginBottom: 12,
+};
+
+const h3Style: CSSProperties = { margin: 0, fontSize: 14 };
+
+const slidersGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+  gap: '4px 24px',
+};
+
+const sliderRow: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  fontSize: 12,
+  marginBottom: 4,
+};
+
+const buttonStyle: CSSProperties = {
+  background: '#89bf5d',
+  color: '#0f1520',
+  border: 'none',
+  borderRadius: 6,
+  padding: '8px 16px',
+  fontWeight: 700,
+  cursor: 'pointer',
+  fontSize: 13,
+};
+
+const infoRowStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  fontSize: 12,
+  color: '#9aa4bf',
+  marginTop: 8,
+};

@@ -84,7 +84,7 @@ export function drawTreeLayer(
   trees: Tree[],
   cellSize: number,
   _season: Season,
-  biomes?: Biome[][],
+  _biomes?: Biome[][],
 ) {
   ctx.imageSmoothingEnabled = false;
   const drawSize = Math.round(cellSize * 2);

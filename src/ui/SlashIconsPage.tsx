@@ -299,19 +299,6 @@ const pageStyle: React.CSSProperties = {
   fontFamily: 'system-ui, -apple-system, sans-serif',
 };
 
-const headerStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: '12px',
-};
-
-const h1Style: React.CSSProperties = {
-  margin: 0,
-  fontSize: '28px',
-  letterSpacing: '0.02em',
-};
-
 const h2Style: React.CSSProperties = {
   margin: '0 0 10px 0',
   fontSize: '15px',
@@ -382,8 +369,3 @@ const uiWrapStyle: React.CSSProperties = {
   alignItems: 'center',
 };
 
-const linkStyle: React.CSSProperties = {
-  color: '#8cb4ff',
-  textDecoration: 'none',
-  fontSize: '13px',
-};

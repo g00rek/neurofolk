@@ -22,7 +22,8 @@ export function EntityPanel({ entity, world, onClose }: EntityPanelProps) {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
         <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: color }} />
-        <span style={{ fontSize: '14px', fontWeight: 'bold' }}>{entity.id}</span>
+        <span style={{ fontSize: '14px', fontWeight: 'bold' }}>{entity.name}</span>
+        <span style={{ fontSize: '10px', color: '#666' }}>{entity.id}</span>
       </div>
       <div style={rowStyle}>
         <span style={dimStyle}>Sex:</span>

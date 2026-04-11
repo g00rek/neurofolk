@@ -39,6 +39,6 @@ export default defineConfig({
   server: {
     port: 5273,
     strictPort: true,
-    allowedHosts: ['evod.g00rek.ovh'],
+    allowedHosts: ['neurodev.g00rek.ovh'],
   },
 })

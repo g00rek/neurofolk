@@ -5,8 +5,6 @@ import { ageInYears } from '../engine/world';
 import { drawSurfaceLayer, drawWaterLayer, drawTreeLayer } from './terrain/renderer';
 import type { Season } from './terrain/renderer';
 
-const GRID_BG = '#1a1b26';
-const GRID_LINE = '#2a2b36';
 const MINI_MEDIEVAL_BASE = '/assets/mini-medieval/Mini-Medieval-8x8';
 const UNITS_SHEET_URL = `${MINI_MEDIEVAL_BASE}/Units.png`;
 const STRUCTURES_SHEET_URL = `${MINI_MEDIEVAL_BASE}/Structures.png`;
@@ -37,17 +35,6 @@ const TRIBE_COLORS: Record<number, [number, number, number]> = {
   2: [60, 180, 60],   // Green
   [-1]: [180, 140, 60], // Ronin
 };
-
-const PLAINS_TILES: Array<{ sx: number; sy: number }> = [
-  { sx: 0, sy: 0 },
-  { sx: 8, sy: 0 },
-  { sx: 16, sy: 0 },
-  { sx: 24, sy: 0 },
-  { sx: 0, sy: 8 },
-  { sx: 8, sy: 8 },
-  { sx: 16, sy: 8 },
-  { sx: 24, sy: 8 },
-];
 
 function entityColor(entity: Entity, villages: Village[]): string {
   const base = TRIBE_COLORS[entity.tribe]
@@ -173,12 +160,11 @@ function drawHouseSprite(
   const srcY = rowByTribe[Math.max(0, Math.min(2, tribe))];
   const srcW = 32;
   const srcH = 40;
-  // Keep strict 1 tile footprint and make houses visually smaller than full cell.
-  const containScale = Math.min(cellSize / srcW, cellSize / srcH) * 0.62;
-  const dstW = srcW * containScale;
-  const dstH = srcH * containScale;
-  const dx = Math.round(x + (cellSize - dstW) / 2);
-  const dy = Math.round(y + cellSize - dstH - cellSize * 0.04);
+  // Full cell width; roof may overshoot above the tile.
+  const dstW = cellSize;
+  const dstH = cellSize * (srcH / srcW); // preserve aspect ratio
+  const dx = Math.round(x);
+  const dy = Math.round(y + cellSize - dstH); // bottom-aligned, roof sticks up
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(sprites.structures, srcX, srcY, srcW, srcH, dx, dy, Math.round(dstW), Math.round(dstH));
 }
@@ -304,40 +290,6 @@ function drawRoadTileSprite(
   const dstH = cellSize;
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(sprites.overworld, srcX, srcY, srcW, srcH, x, y, Math.round(dstW), Math.round(dstH));
-}
-
-function tileNoise01(x: number, y: number, salt: number): number {
-  // Fast deterministic hash in [0,1) for stable tile variation.
-  let h = (x * 374761393 + y * 668265263 + salt * 982451653) | 0;
-  h = (h ^ (h >>> 13)) * 1274126177;
-  h ^= h >>> 16;
-  return (h >>> 0) / 4294967296;
-}
-
-function pickPlainsTile(x: number, y: number): { sx: number; sy: number } {
-  const r = tileNoise01(x, y, 1);
-  // Keep mostly base grass, sprinkle variants for visual richness.
-  if (r < 0.93) return PLAINS_TILES[0];
-  const idx = 1 + Math.floor(tileNoise01(x, y, 2) * 7);
-  return PLAINS_TILES[Math.max(1, Math.min(7, idx))];
-}
-
-function drawPlainsTileSprite(
-  ctx: CanvasRenderingContext2D,
-  sprites: SpriteAssets,
-  tileX: number,
-  tileY: number,
-  x: number,
-  y: number,
-  cellSize: number,
-) {
-  const { sx, sy } = pickPlainsTile(tileX, tileY);
-  const srcW = 8;
-  const srcH = 8;
-  const dstW = cellSize;
-  const dstH = cellSize;
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(sprites.overworld, sx, sy, srcW, srcH, x, y, Math.round(dstW), Math.round(dstH));
 }
 
 function drawAnimal(ctx: CanvasRenderingContext2D, cx: number, cy: number, cellSize: number) {

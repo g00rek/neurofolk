@@ -15,22 +15,26 @@ import { BowlFood, Leaf, Axe } from '@phosphor-icons/react';
 import { DEFAULT_BIOME_PARAMS } from '../engine/biomes';
 import type { BiomeGenParams } from '../engine/biomes';
 
+// One-time migration: clear stale localStorage from old grid sizes
+if (!localStorage.getItem('neurofolk-v2-migrated')) {
+  localStorage.removeItem('neurofolk-map-params');
+  localStorage.setItem('neurofolk-v2-migrated', '1');
+}
+
 function loadMapParams(): { gridSize: number; params: BiomeGenParams } {
   try {
     const raw = localStorage.getItem('neurofolk-map-params');
     if (raw) {
       const saved = JSON.parse(raw);
       return {
-        gridSize: saved.gridSize ?? 30,
+        gridSize: saved.gridSize ?? 10,
         params: { ...DEFAULT_BIOME_PARAMS, ...saved.params },
       };
     }
   } catch { /* ignore */ }
-  return { gridSize: 30, params: { ...DEFAULT_BIOME_PARAMS } };
+  return { gridSize: 10, params: { ...DEFAULT_BIOME_PARAMS } };
 }
 
-const MAP_SETTINGS = loadMapParams();
-const WORLD_GRID_SIZE = MAP_SETTINGS.gridSize;
 const INITIAL_ENTITY_COUNT = 4;
 const VILLAGE_COUNT = 1;
 const INITIAL_SPEED = 300;
@@ -57,11 +61,12 @@ export function App() {
   const initialWorldRef = useRef<WorldState | null>(null);
   const workerRef = useRef<Worker | null>(null);
   if (!initialWorldRef.current) {
+    const mapSettings = loadMapParams();
     initialWorldRef.current = createWorld({
-      gridSize: WORLD_GRID_SIZE,
+      gridSize: mapSettings.gridSize,
       entityCount: INITIAL_ENTITY_COUNT,
       villageCount: VILLAGE_COUNT,
-      biomeParams: MAP_SETTINGS.params,
+      biomeParams: mapSettings.params,
     });
   }
 
@@ -179,11 +184,12 @@ export function App() {
   }, [world]);
 
   const handleReset = useCallback(() => {
+    const mapSettings = loadMapParams();
     const nextWorld = createWorld({
-      gridSize: WORLD_GRID_SIZE,
+      gridSize: mapSettings.gridSize,
       entityCount: INITIAL_ENTITY_COUNT,
       villageCount: VILLAGE_COUNT,
-      biomeParams: MAP_SETTINGS.params,
+      biomeParams: mapSettings.params,
     });
     setWorld(nextWorld);
     setRunning(false);
@@ -264,13 +270,13 @@ export function App() {
               onClick={handleCanvasClick}
             />
             {resources}
+            <EventLog log={world.log} />
           </div>
           <div style={sidebarStyle}>
             {tilePanel}
             {entityPanel}
             <Stats world={world} />
             {graph}
-            <EventLog log={world.log} />
           </div>
         </div>
       </div>
@@ -289,11 +295,11 @@ export function App() {
         onClick={handleCanvasClick}
       />
       {resources}
+      <EventLog log={world.log} />
       {graph}
       {tilePanel}
       {entityPanel}
       <Stats world={world} />
-      <EventLog log={world.log} />
     </div>
   );
 }

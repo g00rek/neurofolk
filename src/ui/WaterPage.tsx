@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Biome } from '../engine/types';
 import { buildWaterTopology } from './terrain/waterAutotile';
-import { drawTerrain, drawGridOverlay } from './terrain/renderer';
+import { drawTerrain } from './terrain/renderer';
 
 const MINI_MEDIEVAL_BASE = '/assets/mini-medieval/Mini-Medieval-8x8';
 const OVERWORLD = `${MINI_MEDIEVAL_BASE}/Overworld.png`;

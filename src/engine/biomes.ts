@@ -47,19 +47,6 @@ function cloneGrid(grid: Biome[][]): Biome[][] {
 // This inherently produces thick, organic blobs — narrow 1-2 tile
 // passages vanish within a few iterations.
 
-function waterNeighborCount8(grid: Biome[][], x: number, y: number): number {
-  let count = 0;
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      if (dx === 0 && dy === 0) continue;
-      const nx = x + dx, ny = y + dy;
-      if (ny < 0 || ny >= grid.length || nx < 0 || nx >= grid[ny].length) continue;
-      if (grid[ny][nx] === 'water') count++;
-    }
-  }
-  return count;
-}
-
 /**
  * CA smoothing using CARDINAL neighbours only (4-connected).
  * Rule: water survives if ≥2 cardinal water neighbours,
@@ -178,50 +165,6 @@ function removeTinyWaterPockets(grid: Biome[][], minSize: number): Biome[][] {
  * Priority: water > mountain > forest.
  * Lower-priority biome yields to plains if within 1 tile of higher-priority.
  */
-function separateBiomes(grid: Biome[][]): Biome[][] {
-  const next = cloneGrid(grid);
-  const h = grid.length;
-  const w = grid[0]?.length ?? 0;
-
-  // Build distance-1 zones around each biome type (cardinal + diagonal)
-  const nearWater = Array.from({ length: h }, () => Array.from({ length: w }, () => false));
-  const nearMountain = Array.from({ length: h }, () => Array.from({ length: w }, () => false));
-  const nearForest = Array.from({ length: h }, () => Array.from({ length: w }, () => false));
-
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const b = grid[y][x];
-      if (b !== 'water' && b !== 'mountain' && b !== 'forest') continue;
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          if (dx === 0 && dy === 0) continue;
-          const nx = x + dx, ny = y + dy;
-          if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
-          if (b === 'water') nearWater[ny][nx] = true;
-          else if (b === 'mountain') nearMountain[ny][nx] = true;
-          else if (b === 'forest') nearForest[ny][nx] = true;
-        }
-      }
-    }
-  }
-
-  // Forest near water or mountain → plains
-  // Mountain near water → plains
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const b = next[y][x];
-      if (b === 'forest' && (nearWater[y][x] || nearMountain[y][x])) {
-        next[y][x] = 'plains';
-      } else if (b === 'mountain' && nearWater[y][x]) {
-        next[y][x] = 'plains';
-      } else if (b === 'mountain' && nearForest[y][x]) {
-        next[y][x] = 'plains';
-      }
-    }
-  }
-  return next;
-}
-
 // ── Border cleanup ───────────────────────────────────────────────────
 
 function clearWaterOnBorder(grid: Biome[][], margin: number): Biome[][] {
@@ -233,28 +176,6 @@ function clearWaterOnBorder(grid: Biome[][], margin: number): Biome[][] {
       if ((x < margin || y < margin || x >= w - margin || y >= h - margin) && next[y][x] === 'water') {
         next[y][x] = 'plains';
       }
-    }
-  }
-  return next;
-}
-
-// ── Fallback: carve a circular water patch ───────────────────────────
-
-function carveWaterPatch(grid: Biome[][], needCount: number): Biome[][] {
-  const next = cloneGrid(grid);
-  const h = next.length;
-  const w = next[0]?.length ?? 0;
-  if (w === 0 || h === 0 || needCount <= 0) return next;
-  const margin = 3;
-  const cx = margin + Math.floor(Math.random() * Math.max(1, w - 2 * margin));
-  const cy = margin + Math.floor(Math.random() * Math.max(1, h - 2 * margin));
-  const r = Math.max(3, Math.floor(Math.sqrt(needCount / Math.PI)));
-  let added = 0;
-  for (let y = Math.max(margin, cy - r); y <= Math.min(h - 1 - margin, cy + r); y++) {
-    for (let x = Math.max(margin, cx - r); x <= Math.min(w - 1 - margin, cx + r); x++) {
-      if ((x - cx) ** 2 + (y - cy) ** 2 > r * r) continue;
-      if (next[y][x] !== 'water') { next[y][x] = 'water'; added++; }
-      if (added >= needCount) return next;
     }
   }
   return next;
