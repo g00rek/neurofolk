@@ -173,6 +173,30 @@ export function SlashIconsPage() {
           <SpriteAnimation src={UNITS} frames={[152,160,168,176].map(sx => ({ sx, sy: 128 }))} label="female blue walk" ms={150} />
           <SpriteAnimation src={UNITS} frames={[152,160,168,176].map(sx => ({ sx, sy: 120 }))} label="female green walk" ms={150} />
         </div>
+      </section>
+
+      <section style={sectionStyle}>
+        <h2 style={h2Style}>People Run Animation (4 frames)</h2>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <SpriteAnimation src={UNITS} frames={[80,88,96,104].map(sx => ({ sx, sy: 32 }))} label="male red run" ms={120} />
+          <SpriteAnimation src={UNITS} frames={[80,88,96,104].map(sx => ({ sx, sy: 64 }))} label="male blue run" ms={120} />
+          <SpriteAnimation src={UNITS} frames={[80,88,96,104].map(sx => ({ sx, sy: 56 }))} label="male green run" ms={120} />
+          <SpriteAnimation src={UNITS} frames={[80,88,96,104].map(sx => ({ sx, sy: 96 }))} label="female red run" ms={120} />
+          <SpriteAnimation src={UNITS} frames={[80,88,96,104].map(sx => ({ sx, sy: 128 }))} label="female blue run" ms={120} />
+          <SpriteAnimation src={UNITS} frames={[80,88,96,104].map(sx => ({ sx, sy: 120 }))} label="female green run" ms={120} />
+        </div>
+      </section>
+
+      <section style={sectionStyle}>
+        <h2 style={h2Style}>People March Animation (4 frames)</h2>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <SpriteAnimation src={UNITS} frames={[224,232,240,248].map(sx => ({ sx, sy: 32 }))} label="male red march" ms={180} />
+          <SpriteAnimation src={UNITS} frames={[224,232,240,248].map(sx => ({ sx, sy: 64 }))} label="male blue march" ms={180} />
+          <SpriteAnimation src={UNITS} frames={[224,232,240,248].map(sx => ({ sx, sy: 56 }))} label="male green march" ms={180} />
+          <SpriteAnimation src={UNITS} frames={[224,232,240,248].map(sx => ({ sx, sy: 96 }))} label="female red march" ms={180} />
+          <SpriteAnimation src={UNITS} frames={[224,232,240,248].map(sx => ({ sx, sy: 128 }))} label="female blue march" ms={180} />
+          <SpriteAnimation src={UNITS} frames={[224,232,240,248].map(sx => ({ sx, sy: 120 }))} label="female green march" ms={180} />
+        </div>
         <div style={{ marginTop: 8, fontSize: 11, color: '#666' }}>
           All 4 frames shown individually:
         </div>
