@@ -418,6 +418,9 @@ export function GridCanvas({ world, size, selectedId, selectedTile, onClick }: G
     const draw = () => {
     frameCount++;
 
+    // Wait for sprites to load — don't render fallback shapes
+    if (!spritesRef.current) { raf = requestAnimationFrame(draw); return; }
+
     const dpr = window.devicePixelRatio || 1;
     canvas.width = Math.max(1, Math.floor(size * dpr));
     canvas.height = Math.max(1, Math.floor(size * dpr));
