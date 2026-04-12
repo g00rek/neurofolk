@@ -609,7 +609,7 @@ function detectInteractions(
 
 // --- Pheromone mating: male in range + fertile female → pregnancy chance ---
 
-function pheromoneMating(entities: Entity[], villages: Village[], log: LogEntry[], tickNum: number): Entity[] {
+function pheromoneMating(entities: Entity[], villages: Village[], _houses: House[], log: LogEntry[], tickNum: number): Entity[] {
   const updated = [...entities];
   const matedMaleIds = new Set<string>();
 
@@ -621,7 +621,7 @@ function pheromoneMating(entities: Entity[], villages: Village[], log: LogEntry[
 
   for (const male of males) {
     if (matedMaleIds.has(male.id)) continue;
-    const range = Math.floor(male.traits.perception); // perception = mating range
+    const range = 4; // mating range — must be nearby
 
     // Find fertile females in range
     for (let fi = 0; fi < updated.length; fi++) {
@@ -1522,7 +1522,7 @@ export function tick(state: WorldState): WorldState {
   }
 
   // --- Step 7: Pheromone mating (every tick, not just night) ---
-  entities = pheromoneMating(entities, updatedVillages, log, tickNum);
+  entities = pheromoneMating(entities, updatedVillages, houses, log, tickNum);
 
   // --- Step 7b: Homeless adults claim house slots ---
   for (let i = 0; i < entities.length; i++) {
