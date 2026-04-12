@@ -3,7 +3,7 @@ import {
   MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE, TICKS_PER_YEAR,
   PREGNANCY_DURATION, BIRTH_COOLDOWN, INFANT_MORTALITY, MATERNAL_MORTALITY, FIGHTING_DURATION, TICKS_PER_DAY, MATE_COOLDOWN,
   ENERGY_MAX, ENERGY_START, ENERGY_DRAIN_INTERVAL, ENERGY_MEAT, ENERGY_PLANT,
-  FOOD_RESERVE_MIN, FOOD_RESERVE_PER_PERSON, HUNGER_THRESHOLD, CHILD_AGE, TRAIT_ENERGY_COST, PLANT_RESERVE_MIN,
+  HUNGER_THRESHOLD, CHILD_AGE, TRAIT_ENERGY_COST,
   ANIMAL_COUNT, scaled,
   FIGHT_MIN_AGE, MEAT_PORTIONS_PER_HUNT, TREE_FRUIT_PORTIONS,
   ANIMAL_REPRO_INTERVAL, ANIMAL_MAX, ANIMAL_HUNT_MIN_POPULATION, ANIMAL_FLEE_RANGE, FOREST_SPEED_PENALTY,
@@ -96,20 +96,8 @@ function eatDirectlyToThreshold(entity: Entity, portionEnergy: number, available
   return { entity: { ...entity, energy }, remainingPortions: remaining };
 }
 
-function villageFoodReserveTarget(population: number): number {
-  return Math.max(FOOD_RESERVE_MIN, population * FOOD_RESERVE_PER_PERSON);
-}
 
-function villageNeedsFood(village: Village | undefined, entities: Entity[]): boolean {
-  if (!village) return true;
-  const population = entities.filter(e => e.tribe === village.tribe).length;
-  const target = villageFoodReserveTarget(population);
-  return village.meatStore + village.plantStore < target;
-}
 
-function villageNeedsPlants(village: Village | undefined, entities: Entity[]): boolean {
-  return villageNeedsFood(village, entities) || (!!village && village.plantStore < PLANT_RESERVE_MIN);
-}
 
 export function canHuntAnimalPopulation(animals: Animal[], gridSize: number): boolean {
   return animals.length > scaled(ANIMAL_HUNT_MIN_POPULATION, gridSize, 2);
@@ -1314,19 +1302,24 @@ export function tick(state: WorldState): WorldState {
           }
         }
       }
-      // Use precomputed herd center
-      const herdCenter = herdCenters.get(a.herdAlpha);
-      const herdDist = herdCenter ? manhattan(a.position, herdCenter) : 0;
+      // Find alpha's position for this animal's herd
+      const alpha = animals.find(o => o.id === a.herdAlpha);
+      const alphaPos = alpha?.position ?? herdCenters.get(a.herdAlpha);
+      const alphaDist = alphaPos ? manhattan(a.position, alphaPos) : 0;
 
-      // Check if another herd is too close — flee from it
+      // Check if another herd is too close — alpha flees
       let nearbyOtherHerd: Position | undefined;
+      const herdCenter = herdCenters.get(a.herdAlpha);
       for (const [hId, hPos] of herdCenters) {
         if (hId === a.herdAlpha) continue;
         if (herdCenter && manhattan(herdCenter, hPos) < 8) { nearbyOtherHerd = hPos; break; }
       }
 
-      if (nearestGrass && a.energy < 70) {
-        // Hungry — always seek grass
+      // Non-alpha too far from alpha — ALWAYS return (max leash = 6)
+      if (a.id !== a.herdAlpha && alphaPos && alphaDist > 6) {
+        newPos = stepToward(a.position, alphaPos, biomes, gridSize, houseTiles);
+      } else if (nearestGrass && a.energy < 70) {
+        // Hungry — seek grass
         newPos = stepToward(a.position, nearestGrass, biomes, gridSize, houseTiles);
       } else if (nearbyOtherHerd && a.id === a.herdAlpha && Math.random() < 0.4) {
         // Alpha flees from other herd — keeps herds separated
@@ -1350,11 +1343,11 @@ export function tick(state: WorldState): WorldState {
         newPos = nearestMate
           ? stepToward(a.position, nearestMate.position, biomes, gridSize, houseTiles)
           : a.position;
-      } else if (herdCenter && herdDist > 5 && Math.random() < 0.6) {
-        // Far from herd — move toward center of mass
-        newPos = stepToward(a.position, herdCenter, biomes, gridSize, houseTiles);
-      } else if (herdDist <= 5 && Math.random() < 0.1) {
-        // Close to herd — occasional random wander (grazing drift)
+      } else if (alphaPos && alphaDist > 3 && Math.random() < 0.5) {
+        // Move toward alpha
+        newPos = stepToward(a.position, alphaPos, biomes, gridSize, houseTiles);
+      } else if (alphaDist <= 3 && Math.random() < 0.1) {
+        // Close to alpha — occasional random wander (grazing drift)
         newPos = randomStepBiome(a.position, gridSize, biomes, houseTiles);
       } else {
         newPos = a.position;
