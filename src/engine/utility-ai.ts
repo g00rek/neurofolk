@@ -105,12 +105,10 @@ function scoreBuildHome(ctx: AIContext): number {
 function scoreChopFirewood(ctx: AIContext): number {
   if (ageInYears(ctx.entity) < CHILD_AGE) return 0;
   if (!ctx.village) return 0;
-  // Only chop if village actually needs wood (for building houses)
-  if (!ctx.villageNeedsHouses && ctx.village.woodStore >= HOUSE_WOOD_COST) return 0;
-  const woodTarget = ctx.villageNeedsHouses ? HOUSE_WOOD_COST * 2 : HOUSE_WOOD_COST; // enough for 1-2 houses
-  if (ctx.village.woodStore >= woodTarget) return 0;
+  const woodTarget = ctx.villageNeedsHouses ? HOUSE_WOOD_COST * 2 : scaled(30, ctx.gridSize, 15);
+  if (ctx.village.woodStore >= woodTarget) return 0.05; // idle chop — always something to do
   const woodNeed = (woodTarget - ctx.village.woodStore) / woodTarget;
-  return woodNeed * 0.5;
+  return ctx.villageNeedsHouses ? woodNeed * 0.7 : woodNeed * 0.3;
 }
 
 function scoreHunt(ctx: AIContext): number {
@@ -128,7 +126,9 @@ function scoreHunt(ctx: AIContext): number {
   const ratio = ctx.animalPopulation / Math.max(1, ctx.tribePopulation);
   const sustainability = Math.min(1, ratio / 3); // full score when 3+ animals per human
 
-  const baseScore = Math.max(0.15, foodNeed * 0.9 + panicBoost);
+  // No food need → don't hunt (reserves are full)
+  if (foodNeed === 0) return 0;
+  const baseScore = foodNeed * 0.9 + panicBoost;
   return Math.min(1, baseScore * Math.max(0.1, sustainability));
 }
 

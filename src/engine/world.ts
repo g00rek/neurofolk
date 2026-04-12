@@ -1197,6 +1197,12 @@ export function tick(state: WorldState): WorldState {
   // Also block entity tiles
   for (const e of entities) animalOccupied.add(`${e.position.x},${e.position.y}`);
 
+  // Precompute settlement positions animals should avoid
+  const settlementPositions: Position[] = [];
+  for (const v of updatedVillages) { if (v.stockpile) settlementPositions.push(v.stockpile); }
+  for (const h of houses) { settlementPositions.push({ x: h.position.x + 1, y: h.position.y + 1 }); }
+  const VILLAGE_AVOID_RANGE = scaled(5, gridSize, 3);
+
   for (let ai = 0; ai < animals.length; ai++) {
     const a = animals[ai];
     let newPos: Position;
@@ -1233,6 +1239,24 @@ export function tick(state: WorldState): WorldState {
       newPos = a.position;
       panicTicks--;
     } else {
+      // Avoid settlements — drift away if too close
+      let nearestSettlement: Position | undefined;
+      let nearestSettlementDist = Infinity;
+      for (const sp of settlementPositions) {
+        const d = manhattan(a.position, sp);
+        if (d < VILLAGE_AVOID_RANGE && d < nearestSettlementDist) {
+          nearestSettlementDist = d;
+          nearestSettlement = sp;
+        }
+      }
+      if (nearestSettlement && Math.random() < 0.3) {
+        const dx = a.position.x - nearestSettlement.x;
+        const dy = a.position.y - nearestSettlement.y;
+        const away = Math.abs(dx) >= Math.abs(dy)
+          ? { x: a.position.x + Math.sign(dx || 1), y: a.position.y }
+          : { x: a.position.x, y: a.position.y + Math.sign(dy || 1) };
+        newPos = isValidMove(away, biomes, gridSize, houseTiles) ? away : a.position;
+      } else {
       // Find nearest grass tile
       let nearestGrass: Position | undefined;
       let nearestGrassDist = Infinity;
@@ -1293,6 +1317,7 @@ export function tick(state: WorldState): WorldState {
       } else {
         newPos = a.position;
       }
+      } // close settlement avoidance else
     }
     // Only move if target tile is free
     const newKey = `${newPos.x},${newPos.y}`;
