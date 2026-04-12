@@ -75,6 +75,8 @@ export function App() {
   const [speed, setSpeed] = useState(INITIAL_SPEED);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedTile, setSelectedTile] = useState<Position | null>(null);
+  const [overlayPos, setOverlayPos] = useState<{ x: number; y: number } | null>(null);
+  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
 
   const { w: winW } = useWindowSize();
@@ -171,8 +173,25 @@ export function App() {
     }
   }, [world, selectedId]);
 
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    if (!overlayPos) return;
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: overlayPos.x, origY: overlayPos.y };
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return;
+      setOverlayPos({
+        x: dragRef.current.origX + (ev.clientX - dragRef.current.startX),
+        y: dragRef.current.origY + (ev.clientY - dragRef.current.startY),
+      });
+    };
+    const onUp = () => { dragRef.current = null; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [overlayPos]);
+
   const handleCanvasClick = useCallback((x: number, y: number) => {
     setSelectedTile({ x, y });
+    const cellSize = mapSize / world.gridSize;
+    setOverlayPos({ x: Math.round((x + 1) * cellSize), y: Math.round(y * cellSize) });
     const entity = world.entities.find(
       e => {
         const home = e.homeId ? world.houses.find(house => house.id === e.homeId) : undefined;
@@ -263,18 +282,40 @@ export function App() {
         {extinctBanner}
         <div style={bodyStyle}>
           <div style={mainColStyle}>
-            <GridCanvas
-              world={world}
-              size={mapSize}
-              selectedId={selectedId}
-              onClick={handleCanvasClick}
-            />
+            <div style={{ position: 'relative' }}>
+              <GridCanvas
+                world={world}
+                size={mapSize}
+                selectedId={selectedId}
+                onClick={handleCanvasClick}
+              />
+              {overlayPos && (selectedEntity || selectedTile) && (
+                <div style={{
+                  position: 'absolute',
+                  left: overlayPos.x,
+                  top: overlayPos.y,
+                  width: 220,
+                  background: 'rgba(22, 22, 30, 0.95)',
+                  border: '1px solid #2d3346',
+                  borderRadius: 6,
+                  zIndex: 10,
+                  fontSize: 11,
+                  pointerEvents: 'auto',
+                }}>
+                  <div onMouseDown={handleDragStart} style={{ padding: '6px 8px', cursor: 'grab', borderBottom: '1px solid #2d3346', color: '#888', fontSize: 10, userSelect: 'none' }}>
+                    ⠿ {selectedEntity ? selectedEntity.name : `Tile ${selectedTile?.x},${selectedTile?.y}`}
+                  </div>
+                  <div style={{ padding: 8 }}>
+                    {entityPanel}
+                    {!selectedEntity && tilePanel}
+                  </div>
+                </div>
+              )}
+            </div>
             {resources}
             <EventLog log={world.log} />
           </div>
           <div style={sidebarStyle}>
-            {tilePanel}
-            {entityPanel}
             <Stats world={world} />
             {graph}
           </div>
@@ -287,18 +328,39 @@ export function App() {
     <div style={mobileContainerStyle}>
       {header}
       {extinctBanner}
-      <GridCanvas
-        world={world}
-        size={mapSize}
-        selectedId={selectedId}
-        selectedTile={selectedTile}
-        onClick={handleCanvasClick}
-      />
+      <div style={{ position: 'relative' }}>
+        <GridCanvas
+          world={world}
+          size={mapSize}
+          selectedId={selectedId}
+          selectedTile={selectedTile}
+          onClick={handleCanvasClick}
+        />
+        {overlayPos && (selectedEntity || selectedTile) && (
+          <div style={{
+            position: 'absolute',
+            left: overlayPos.x,
+            top: overlayPos.y,
+            width: 200,
+            background: 'rgba(22, 22, 30, 0.95)',
+            border: '1px solid #2d3346',
+            borderRadius: 6,
+            zIndex: 10,
+            fontSize: 11,
+          }}>
+            <div onMouseDown={handleDragStart} style={{ padding: '6px 8px', cursor: 'grab', borderBottom: '1px solid #2d3346', color: '#888', fontSize: 10, userSelect: 'none' }}>
+              ⠿ {selectedEntity ? selectedEntity.name : `Tile ${selectedTile?.x},${selectedTile?.y}`}
+            </div>
+            <div style={{ padding: 8 }}>
+              {entityPanel}
+              {!selectedEntity && tilePanel}
+            </div>
+          </div>
+        )}
+      </div>
       {resources}
       <EventLog log={world.log} />
       {graph}
-      {tilePanel}
-      {entityPanel}
       <Stats world={world} />
     </div>
   );
