@@ -1220,6 +1220,12 @@ export function tick(state: WorldState): WorldState {
   const herdSizes = new Map<string, number>();
   for (const a of animals) herdSizes.set(a.herdAlpha, (herdSizes.get(a.herdAlpha) ?? 0) + 1);
 
+  // Precompute alpha positions for O(1) lookup
+  const alphaPositions = new Map<string, Position>();
+  for (const a of animals) {
+    if (a.id === a.herdAlpha) alphaPositions.set(a.id, a.position);
+  }
+
   // Precompute settlement positions animals should avoid
   const settlementPositions: Position[] = [];
   for (const v of updatedVillages) { if (v.stockpile) settlementPositions.push(v.stockpile); }
@@ -1245,29 +1251,31 @@ export function tick(state: WorldState): WorldState {
         nearestHumanPos = e.position;
       }
     }
-    // Panic: set dynamic panic when human spotted
+    // Panic: set when human first spotted, don't refresh while already fleeing
     let panicTicks = a.panicTicks;
-    if (nearestHumanPos) {
+    if (nearestHumanPos && panicTicks <= 0) {
       panicTicks = dynamicPanicDuration;
     }
 
-    if (panicTicks > 0 && tickNum % 2 === 0) {
-      // Flee away from last known human direction (or random if no human visible)
-      const fleeFrom = nearestHumanPos ?? { x: a.position.x, y: a.position.y };
-      const dx = a.position.x - fleeFrom.x;
-      const dy = a.position.y - fleeFrom.y;
-      const flee = (dx !== 0 || dy !== 0)
-        ? (Math.abs(dx) >= Math.abs(dy)
-          ? { x: a.position.x + Math.sign(dx), y: a.position.y }
-          : { x: a.position.x, y: a.position.y + Math.sign(dy) })
-        : randomStepBiome(a.position, gridSize, biomes, houseTiles);
-      newPos = isValidMove(flee, biomes, gridSize, houseTiles)
-        ? flee : randomStepBiome(a.position, gridSize, biomes, houseTiles);
+    if (panicTicks > 0) {
       panicTicks--;
-    } else if (panicTicks > 0) {
-      // Odd tick during panic — stay (reaction delay)
-      newPos = a.position;
-      panicTicks--;
+      if (tickNum % 2 === 0) {
+        // Flee away from nearest human, or random if no human visible
+        if (nearestHumanPos) {
+          const dx = a.position.x - nearestHumanPos.x;
+          const dy = a.position.y - nearestHumanPos.y;
+          const flee = Math.abs(dx) >= Math.abs(dy)
+            ? { x: a.position.x + Math.sign(dx || 1), y: a.position.y }
+            : { x: a.position.x, y: a.position.y + Math.sign(dy || 1) };
+          newPos = isValidMove(flee, biomes, gridSize, houseTiles)
+            ? flee : randomStepBiome(a.position, gridSize, biomes, houseTiles);
+        } else {
+          // No human visible but still panicked — random flee
+          newPos = randomStepBiome(a.position, gridSize, biomes, houseTiles);
+        }
+      } else {
+        newPos = a.position; // reaction delay on odd ticks
+      }
     } else {
       // Avoid settlements — drift away if too close
       let nearestSettlement: Position | undefined;
@@ -1302,9 +1310,8 @@ export function tick(state: WorldState): WorldState {
           }
         }
       }
-      // Find alpha's position for this animal's herd
-      const alpha = animals.find(o => o.id === a.herdAlpha);
-      const alphaPos = alpha?.position ?? herdCenters.get(a.herdAlpha);
+      // Alpha's position (precomputed) or herd center as fallback
+      const alphaPos = alphaPositions.get(a.herdAlpha) ?? herdCenters.get(a.herdAlpha);
       const alphaDist = alphaPos ? manhattan(a.position, alphaPos) : 0;
 
       // Check if another herd is too close — alpha flees
