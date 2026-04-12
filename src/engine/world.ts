@@ -1318,6 +1318,10 @@ export function tick(state: WorldState): WorldState {
   }
 
   // --- Step 5b: Reproduce animals (adjacent tiles, M+F, requires energy) ---
+  // Count herd sizes for adaptive reproduction
+  const herdSizes = new Map<string, number>();
+  for (const a of animals) herdSizes.set(a.herdAlpha, (herdSizes.get(a.herdAlpha) ?? 0) + 1);
+
   if (animals.length < animalMax) {
     const matedIds = new Set<string>();
     const babyAnimals: Animal[] = [];
@@ -1331,8 +1335,12 @@ export function tick(state: WorldState): WorldState {
       if (!mate) continue;
       matedIds.add(female.id);
       matedIds.add(mate.id);
-      female.reproTimer = ANIMAL_REPRO_INTERVAL;
-      mate.reproTimer = ANIMAL_REPRO_INTERVAL;
+      // Adaptive reproduction: small herds breed fast, large herds slow
+      const myHerdSize = herdSizes.get(female.herdAlpha) ?? 1;
+      const reproSpeed = Math.max(0.2, Math.min(1, myHerdSize / MAX_HERD_SIZE));
+      const cooldown = Math.round(ANIMAL_REPRO_INTERVAL * reproSpeed);
+      female.reproTimer = cooldown;
+      mate.reproTimer = cooldown;
       const ns = neighbors(female.position, gridSize).filter(n => isPassable(biomes[n.y][n.x]));
       if (ns.length === 0) continue;
       babyAnimals.push({
@@ -1390,6 +1398,40 @@ export function tick(state: WorldState): WorldState {
         if (a.id === newAlpha.id || Math.random() < 0.5) {
           a.herdAlpha = newAlpha.id;
           moved++;
+        }
+      }
+    }
+  }
+
+  // --- Step 5e: Animal migration — new animals arrive when population is low ---
+  {
+    const targetPop = scaled(ANIMAL_COUNT, gridSize, 4);
+    if (animals.length < targetPop / 2 && tickNum % 200 === 0) {
+      // Spawn a small group at map edge every ~10 days when population is critically low
+      const edge = Math.random() < 0.5 ? 0 : gridSize - 1;
+      const along = Math.floor(Math.random() * gridSize);
+      const isHorizontal = Math.random() < 0.5;
+      const spawnPos = isHorizontal ? { x: along, y: edge } : { x: edge, y: along };
+      if (isPassable(biomes[spawnPos.y][spawnPos.x])) {
+        const alphaId = generateId('a');
+        const count = 3 + Math.floor(Math.random() * 3); // 3-5 animals
+        for (let i = 0; i < count; i++) {
+          const pos = i === 0 ? spawnPos : (() => {
+            for (let a = 0; a < 10; a++) {
+              const p = { x: spawnPos.x + Math.floor(Math.random() * 5) - 2, y: spawnPos.y + Math.floor(Math.random() * 5) - 2 };
+              if (p.x >= 0 && p.x < gridSize && p.y >= 0 && p.y < gridSize && isPassable(biomes[p.y][p.x])) return p;
+            }
+            return spawnPos;
+          })();
+          animals.push({
+            id: i === 0 ? alphaId : generateId('a'),
+            position: pos,
+            gender: i < count / 2 ? 'male' : 'female',
+            energy: ANIMAL_ENERGY_START,
+            reproTimer: 0,
+            panicTicks: 0,
+            herdAlpha: alphaId,
+          });
         }
       }
     }
