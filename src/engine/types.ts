@@ -34,11 +34,7 @@ export interface Village {
 
 export const WOOD_PER_CHOP = 3;           // wood portions from chopping 1 forest tile
 export const HOUSE_WOOD_COST = 15;        // wood needed to build a 3×3 house
-export const WINTER_WOOD_COST = 1;        // wood reserved per house for the whole winter
 export const WINTER_COLD_DAMAGE = 2;      // energy lost per tick without heating in winter
-
-// No food requirement for mating — they just need energy
-export const VILLAGE_OPTIMAL_POP = 12; // above this, mating energy cost rises
 
 export interface EntityGoal {
   type: 'hunt' | 'gather' | 'chop' | 'return_home' | 'build';
@@ -116,15 +112,12 @@ export interface Tree {
 
 export const TREE_FRUIT_PORTIONS = 5;    // max fruit portions per fruiting tree
 
-export const TREE_REGROW_TICKS = 7200; // ~3 years for chopped tree to regrow
-export const FOREST_REGROW_TIME = 7200; // legacy alias
 export const FIGHT_MIN_AGE = 16;
 export const CHOPPING_DURATION = 5;  // half day
 export const BUILDING_DURATION = 40; // 4 days for a 3×3 house
 // Speed trait = tiles per tick (1-3). No multiplier — 1 tick = 1 step at speed 1.
 export const TICKS_PER_DAY = 20; // 10 day + 10 night
 export const DAY_TICKS = 10;     // first 10 ticks = daytime
-export const NIGHT_TICKS = 10;   // last 10 ticks = nighttime
 
 export const MATE_COOLDOWN = 200;      // ticks after impregnation before male can mate again
 
@@ -155,16 +148,12 @@ export const TICKS_PER_YEAR = 2400; // 20 ticks/day × 10 days/month × 12 month
 export const PREGNANCY_DURATION = 600;  // ~30 days
 export const BIRTH_COOLDOWN = 1800;     // ~90 days after birth before next pregnancy (60 days × 10 ticks)
 export const FIGHTING_DURATION = 5;   // half day
-export const HUNTING_DURATION = 0;   // instant on contact
-export const GATHERING_DURATION = 0; // instant on contact
-
 // Energy
 export const ENERGY_MAX = 100;
 export const ENERGY_START = 80;
 export const ENERGY_DRAIN_INTERVAL = 15; // standard drain
 export const ENERGY_MEAT = 25;           // meat portion
 export const ENERGY_PLANT = 18;          // fruit portion
-export const ENERGY_MATING_MIN = 30;
 export const HUNGER_THRESHOLD = 40; // eat from pantry when truly hungry
 export const CHILD_AGE = 3; // children don't work/fight/lose energy (years)
 export const INFANT_MORTALITY = 0.3; // 30% chance child dies at birth (historical rate)
@@ -172,7 +161,6 @@ export const MATERNAL_MORTALITY = 0.05; // 5% chance mother dies per birth
 
 export const FOOD_RESERVE_PER_PERSON = 10; // portions per person — hunt/gather until well stocked
 export const FOOD_RESERVE_MIN = 30;        // minimum even for tiny populations
-export const PLANT_RESERVE_MIN = 20;
 
 // Resources — base values tuned for 30×30 (900 tiles)
 export const ANIMAL_COUNT = 12;
