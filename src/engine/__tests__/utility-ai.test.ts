@@ -49,6 +49,9 @@ function makeContext(overrides: Partial<AIContext> = {}): AIContext {
     nearHome: true,
 
     villageNeedsHouses: false,
+    totalFood: 5,
+    totalMeat: 5,
+    totalPlant: 0,
     tribePopulation: 12,
     animalPopulation: 30,
     gridSize: 30,

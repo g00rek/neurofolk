@@ -50,6 +50,9 @@ export interface AIContext {
   nearestForest?: { pos: Position; dist: number };
   villageNeedsHouses: boolean;
   nearestBuildSite?: { pos: Position; dist: number };
+  totalFood: number;        // meat + fruit across all tribe buildings + stockpile
+  totalMeat: number;
+  totalPlant: number;
   tribePopulation: number;
   animalPopulation: number;
   gridSize: number;
@@ -65,8 +68,7 @@ function foodReserveTarget(ctx: AIContext): number {
 }
 
 function totalVillageFood(ctx: AIContext): number {
-  if (!ctx.village) return 0;
-  return ctx.village.meatStore + ctx.village.plantStore;
+  return ctx.totalFood;
 }
 
 function survivalForageAction(ctx: AIContext, survivalScore: number): AIAction | undefined {
@@ -119,7 +121,7 @@ function scoreHunt(ctx: AIContext): number {
   const target = foodReserveTarget(ctx);
   const totalFood = totalVillageFood(ctx);
   const foodNeed = Math.max(0, (target - totalFood) / target);
-  const panicBoost = ctx.village.meatStore < PANIC_MEAT_THRESHOLD ? 0.25 : 0;
+  const panicBoost = ctx.totalMeat < PANIC_MEAT_THRESHOLD ? 0.25 : 0;
 
   // Sustainable hunting: pressure scales with animal-to-human ratio
   // Many animals per human → hunt freely. Few animals → hunt rarely.
@@ -138,7 +140,7 @@ function scoreGather(ctx: AIContext): number {
   const target = foodReserveTarget(ctx);
   const totalFood = totalVillageFood(ctx);
   const foodNeed = Math.max(0, (target - totalFood) / target);
-  const panicBoost = ctx.village.plantStore < PANIC_PLANT_THRESHOLD ? 0.2 : 0;
+  const panicBoost = ctx.totalPlant < PANIC_PLANT_THRESHOLD ? 0.2 : 0;
   // Always gather if fruit trees visible — stockpile for winter
   const stockpileBoost = ctx.nearestFruitTree ? 0.3 : 0;
   return Math.min(1, Math.max(foodNeed * 0.6 + panicBoost, stockpileBoost));
@@ -399,6 +401,10 @@ export function buildAIContext(
     nearestForest,
     villageNeedsHouses,
     nearestBuildSite,
+    // Total food across stockpile + all tribe houses
+    totalMeat: (village?.meatStore ?? 0) + tribeHouses.reduce((s, h) => s + h.inventory.meat, 0),
+    totalPlant: (village?.plantStore ?? 0) + tribeHouses.reduce((s, h) => s + h.inventory.fruit, 0),
+    totalFood: (village?.meatStore ?? 0) + (village?.plantStore ?? 0) + tribeHouses.reduce((s, h) => s + h.inventory.meat + h.inventory.fruit, 0),
     tribePopulation,
     animalPopulation: animals.length,
     gridSize,

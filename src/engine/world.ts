@@ -633,12 +633,14 @@ function pheromoneMating(entities: Entity[], villages: Village[], _houses: House
       if (female.tribe !== male.tribe) continue;
       if (!female.homeId) continue; // only females with a home can get pregnant
 
-      // Food-based fertility: village needs at least 2 food per person
+      // Food-based fertility: total food (stockpile + houses) >= 2 per person
       const village = villages.find(v => v.tribe === female.tribe);
       if (village) {
         const tribePop = entities.filter(e => e.tribe === female.tribe).length;
-        const totalFood = village.meatStore + village.plantStore;
-        if (totalFood < tribePop * 2) continue; // too hungry to reproduce
+        const tribeHouses = _houses.filter(h => h.tribe === female.tribe);
+        const totalFood = village.meatStore + village.plantStore
+          + tribeHouses.reduce((s, h) => s + h.inventory.meat + h.inventory.fruit, 0);
+        if (totalFood < tribePop * 2) continue;
       }
 
       const dist = manhattan(male.position, female.position);
