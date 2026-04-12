@@ -106,7 +106,7 @@ function scoreChopFirewood(ctx: AIContext): number {
   if (ageInYears(ctx.entity) < CHILD_AGE) return 0;
   if (!ctx.village) return 0;
   const woodTarget = ctx.villageNeedsHouses ? HOUSE_WOOD_COST * 2 : scaled(30, ctx.gridSize, 15);
-  if (ctx.village.woodStore >= woodTarget) return 0.05; // idle chop — always something to do
+  if (ctx.village.woodStore >= woodTarget) return 0; // enough wood, do something else
   const woodNeed = (woodTarget - ctx.village.woodStore) / woodTarget;
   return ctx.villageNeedsHouses ? woodNeed * 0.7 : woodNeed * 0.3;
 }
@@ -231,10 +231,8 @@ export function decideAction(ctx: AIContext): AIAction {
     scores.push({ key: 'return_home', score: returnScore, action: () => ({ type: 'return_home' }) });
   }
 
-  // Default: stroll around settlement
-  if (ctx.nearHome) {
-    scores.push({ key: 'play', score: 0.02, action: () => ({ type: 'play' }) });
-  }
+  // Default: stroll around settlement (men train when they meet)
+  scores.push({ key: 'play', score: 0.04, action: () => ({ type: 'play' }) });
 
   // Absolute fallback
   scores.push({ key: 'rest', score: 0.01, action: () => ({ type: 'rest' }) });
