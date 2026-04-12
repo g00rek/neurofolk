@@ -79,12 +79,12 @@ export function App() {
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
 
-  const { w: winW } = useWindowSize();
+  const { w: winW, h: winH } = useWindowSize();
   const isDesktop = winW >= 1024;
   const PAD = isDesktop ? 16 : 12;
-  const mapSize = isDesktop
-    ? winW - SIDEBAR_W - PAD * 2 - 32 // padding + gap + scrollbar
-    : Math.min(winW - PAD * 2, 600);
+  const availableW = isDesktop ? winW - SIDEBAR_W - PAD * 2 - 32 : winW - PAD * 2;
+  const availableH = winH - 120; // header + controls
+  const mapSize = Math.min(availableW, availableH, isDesktop ? 9999 : 600);
   const graphW = isDesktop ? SIDEBAR_W - 26 : mapSize - 20;
 
   const extinct = world.entities.length === 0 && world.tick > 0;
