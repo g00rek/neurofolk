@@ -1406,7 +1406,7 @@ export function tick(state: WorldState): WorldState {
       matedIds.add(female.id);
       matedIds.add(mate.id);
       // Adaptive reproduction: scales with TOTAL population vs carrying capacity
-      const carryingCapacity = scaled(15, gridSize, 4); // ~15 animals on 30x30
+      const carryingCapacity = scaled(10, gridSize, 3); // ~10 animals on 30x30
       const popRatio = animals.length / carryingCapacity;
       // Below capacity: fast breeding. Above: exponentially slower.
       const cooldown = popRatio <= 1
