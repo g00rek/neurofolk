@@ -456,21 +456,43 @@ export function createWorld(options: CreateWorldOptions): WorldState {
     )
   );
 
-  // Create animals in 2+ initial herds
+  // Create animals in 2 initial herds, placed far apart
   const animalCount = scaled(ANIMAL_COUNT, gridSize, 4);
-  const herdsCount = Math.max(2, Math.floor(animalCount / 6));
-  const alphaIds: string[] = [];
+  const herdsCount = 2;
+
+  // Find 2 herd spawn points far apart
+  const herdSpawns: Position[] = [];
   for (let h = 0; h < herdsCount; h++) {
-    alphaIds.push(generateId('a'));
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const pos = randomPassablePos(biomes, gridSize);
+      if (biomes[pos.y][pos.x] === 'water') continue;
+      const farEnough = herdSpawns.every(s => manhattan(s, pos) > gridSize * 0.5);
+      if (farEnough || attempt > 150) { herdSpawns.push(pos); break; }
+    }
   }
+  if (herdSpawns.length < herdsCount) {
+    while (herdSpawns.length < herdsCount) herdSpawns.push(randomPassablePos(biomes, gridSize));
+  }
+
+  const alphaIds: string[] = [];
+  for (let h = 0; h < herdsCount; h++) alphaIds.push(generateId('a'));
+
   const animals: Animal[] = [];
   for (let i = 0; i < animalCount; i++) {
     const herdIdx = i % herdsCount;
     const isAlpha = i < herdsCount;
     const id = isAlpha ? alphaIds[herdIdx] : generateId('a');
+    // Spawn near herd center (within 3 tiles)
+    const spawn = herdSpawns[herdIdx];
+    let pos = spawn;
+    for (let a = 0; a < 20; a++) {
+      const candidate = { x: spawn.x + Math.floor(Math.random() * 7) - 3, y: spawn.y + Math.floor(Math.random() * 7) - 3 };
+      if (candidate.x >= 0 && candidate.x < gridSize && candidate.y >= 0 && candidate.y < gridSize
+          && isPassable(biomes[candidate.y][candidate.x])) { pos = candidate; break; }
+    }
     animals.push({
       id,
-      position: randomPassablePos(biomes, gridSize),
+      position: pos,
       gender: i < animalCount / 2 ? 'male' : 'female',
       energy: ANIMAL_ENERGY_START,
       reproTimer: Math.floor(Math.random() * ANIMAL_REPRO_INTERVAL),
@@ -1152,6 +1174,20 @@ export function tick(state: WorldState): WorldState {
   entities = detectInteractions(entities, gridSize, resolvedIds, updatedVillages, houses, log, tickNum);
 
   // --- Step 5: Move animals (AFTER humans so hunters can catch them) ---
+  // Precompute herd centers for inter-herd repulsion
+  const herdCenters = new Map<string, Position>();
+  {
+    const herdSums = new Map<string, { x: number; y: number; n: number }>();
+    for (const a of animals) {
+      const s = herdSums.get(a.herdAlpha) ?? { x: 0, y: 0, n: 0 };
+      s.x += a.position.x; s.y += a.position.y; s.n++;
+      herdSums.set(a.herdAlpha, s);
+    }
+    for (const [id, s] of herdSums) {
+      herdCenters.set(id, { x: Math.round(s.x / s.n), y: Math.round(s.y / s.n) });
+    }
+  }
+
   // Build animal occupancy set — 1 animal per tile
   const animalOccupied = new Set<string>();
   for (const a of animals) animalOccupied.add(`${a.position.x},${a.position.y}`);
@@ -1209,30 +1245,34 @@ export function tick(state: WorldState): WorldState {
           }
         }
       }
-      // Compute herd center for THIS animal's herd only
-      let herdCx = 0, herdCy = 0, herdCount = 0;
-      for (const other of animals) {
-        if (other.herdAlpha !== a.herdAlpha || other.id === a.id) continue;
-        herdCx += other.position.x;
-        herdCy += other.position.y;
-        herdCount++;
-      }
-      let herdCenter: Position | undefined;
-      let herdDist = 0;
-      if (herdCount > 0) {
-        herdCenter = { x: Math.round(herdCx / herdCount), y: Math.round(herdCy / herdCount) };
-        herdDist = manhattan(a.position, herdCenter);
+      // Use precomputed herd center
+      const herdCenter = herdCenters.get(a.herdAlpha);
+      const herdDist = herdCenter ? manhattan(a.position, herdCenter) : 0;
+
+      // Check if another herd is too close — flee from it
+      let nearbyOtherHerd: Position | undefined;
+      for (const [hId, hPos] of herdCenters) {
+        if (hId === a.herdAlpha) continue;
+        if (herdCenter && manhattan(herdCenter, hPos) < 8) { nearbyOtherHerd = hPos; break; }
       }
 
       if (nearestGrass && a.energy < 70) {
         // Hungry — always seek grass
         newPos = stepToward(a.position, nearestGrass, biomes, gridSize, houseTiles);
+      } else if (nearbyOtherHerd && a.id === a.herdAlpha && Math.random() < 0.4) {
+        // Alpha flees from other herd — keeps herds separated
+        const dx = a.position.x - nearbyOtherHerd.x;
+        const dy = a.position.y - nearbyOtherHerd.y;
+        const away = Math.abs(dx) >= Math.abs(dy)
+          ? { x: a.position.x + Math.sign(dx || 1), y: a.position.y }
+          : { x: a.position.x, y: a.position.y + Math.sign(dy || 1) };
+        newPos = isValidMove(away, biomes, gridSize, houseTiles) ? away : a.position;
       } else if (a.reproTimer === 0 && a.energy >= ANIMAL_REPRO_MIN_ENERGY && Math.random() < 0.3) {
-        // Seek mate
+        // Seek mate (within own herd only)
         const oppositeGender = a.gender === 'male' ? 'female' : 'male';
         let nearestMate: Animal | undefined;
         for (const other of animals) {
-          if (other.id === a.id || other.gender !== oppositeGender) continue;
+          if (other.id === a.id || other.gender !== oppositeGender || other.herdAlpha !== a.herdAlpha) continue;
           const d = manhattan(a.position, other.position);
           if (d > 0 && d <= 10 && (!nearestMate || d < manhattan(a.position, nearestMate.position))) {
             nearestMate = other;
