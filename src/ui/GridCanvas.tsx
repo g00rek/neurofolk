@@ -454,17 +454,19 @@ export function GridCanvas({ world, size, selectedId, selectedTile, onClick }: G
         : Math.floor(frameCount / 60) % 2;  // idle: slow animation (~1s)
       drawAnimalSprite(ctx, sprites, cx, cy, cellSize, animal.gender, animalFrame, moving, facingLeft);
 
-      // Herd number above animal
+      // Herd number (+ alpha symbol for alpha male)
       const herdNum = herdNumMap.get(animal.herdAlpha) ?? 0;
+      const isAlpha = animal.id === animal.herdAlpha;
+      const label = isAlpha ? `α${herdNum}` : String(herdNum);
       const fontSize = Math.max(8, Math.round(cellSize * 0.45));
       ctx.font = `bold ${fontSize}px system-ui`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = isAlpha ? '#ffd700' : '#fff';
       ctx.strokeStyle = '#000';
       ctx.lineWidth = Math.max(1, fontSize * 0.2);
-      ctx.strokeText(String(herdNum), cx, cy - cellSize * 0.3);
-      ctx.fillText(String(herdNum), cx, cy - cellSize * 0.3);
+      ctx.strokeText(label, cx, cy - cellSize * 0.3);
+      ctx.fillText(label, cx, cy - cellSize * 0.3);
     }
 
     // --- Group entities by tile ---
