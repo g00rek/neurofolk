@@ -10,7 +10,7 @@ interface EventLogProps {
 type Category = 'all' | 'food' | 'life' | 'combat' | 'build';
 const CATEGORY_TYPES: Record<Category, LogEventType[] | 'all'> = {
   all:    'all',
-  food:   ['hunt', 'gather', 'chop'],                       // resource gathering
+  food:   ['hunt', 'gather', 'chop', 'mine'],               // resource gathering
   life:   ['birth', 'death', 'pregnant'],                   // reproduction + mortality
   combat: ['fight'],                                        // combat
   build:  ['build_start', 'build_done', 'house_claimed'],   // housing
@@ -78,6 +78,8 @@ function formatEntry(entry: LogEntry): string {
       return `${name} gathered plants`;
     case 'chop':
       return `${name} chopped wood${entry.detail ? ` ${entry.detail}` : ''}`;
+    case 'mine':
+      return `${name} mined gold${entry.detail ? ` ${entry.detail}` : ''}`;
     case 'build_start':
       return `${name} started building`;
     case 'build_done':
