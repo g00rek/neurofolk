@@ -609,10 +609,12 @@ export function buildAIContext(
   }
 
   // Find nearest gold deposit with remaining ore
+  const GOLD_SENSE = 12; // knowledge of mountain resources within ~12 manhattan tiles
   let nearestGoldDeposit: AIContext['nearestGoldDeposit'];
   for (const d of goldDeposits) {
     if (d.remaining <= 0) continue;
     const dist = Math.abs(d.position.x - entity.position.x) + Math.abs(d.position.y - entity.position.y);
+    if (dist > GOLD_SENSE) continue; // out of sense range
     if (dist > 0 && (!nearestGoldDeposit || dist < nearestGoldDeposit.dist)) {
       nearestGoldDeposit = { pos: d.position, dist };
     }

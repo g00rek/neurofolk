@@ -13,6 +13,7 @@ import {
   Lightning,
   PersonSimpleRun,
   Rabbit,
+  Shovel,
   Sun,
   Users,
 } from '@phosphor-icons/react';
@@ -27,7 +28,7 @@ interface StatsProps {
 
 // Map state↔goal: each activity counts entity if it's actively doing it OR en route.
 // Counts an entity as "doing X" if they're actively working on it OR walking to do it.
-function isDoing(e: Entity, kind: 'hunt' | 'gather' | 'chop' | 'build' | 'cook' | 'depositing'): boolean {
+function isDoing(e: Entity, kind: 'hunt' | 'gather' | 'chop' | 'build' | 'cook' | 'mine' | 'depositing'): boolean {
   const a = e.activity;
   switch (kind) {
     case 'hunt':       return (a.kind === 'working' && a.action === 'hunting')   || (a.kind === 'moving' && a.purpose === 'hunt');
@@ -35,6 +36,7 @@ function isDoing(e: Entity, kind: 'hunt' | 'gather' | 'chop' | 'build' | 'cook' 
     case 'chop':       return (a.kind === 'working' && a.action === 'chopping')  || (a.kind === 'moving' && a.purpose === 'chop');
     case 'build':      return (a.kind === 'working' && a.action === 'building')  || (a.kind === 'moving' && a.purpose === 'build');
     case 'cook':       return (a.kind === 'working' && a.action === 'cooking')   || (a.kind === 'moving' && a.purpose === 'cook');
+    case 'mine':       return (a.kind === 'working' && a.action === 'mining')    || (a.kind === 'moving' && a.purpose === 'mine');
     case 'depositing': return a.kind === 'moving' && a.purpose === 'deposit';
   }
 }
@@ -46,6 +48,7 @@ export function Stats({ world }: StatsProps) {
   const chopping  = world.entities.filter(e => isDoing(e, 'chop')).length;
   const building  = world.entities.filter(e => isDoing(e, 'build')).length;
   const cooking   = world.entities.filter(e => isDoing(e, 'cook')).length;
+  const mining    = world.entities.filter(e => isDoing(e, 'mine')).length;
   const depositing = world.entities.filter(e => isDoing(e, 'depositing')).length;
   const avgAge = world.entities.length > 0
     ? Math.round(world.entities.reduce((sum, e) => sum + ageInYears(e), 0) / world.entities.length)
@@ -260,6 +263,7 @@ export function Stats({ world }: StatsProps) {
           <div style={activityRowStyle}><Axe size={12} /> {chopping} chopping</div>
           <div style={activityRowStyle}><Hammer size={12} /> {building} building</div>
           <div style={activityRowStyle}><CookingPot size={12} /> {cooking} cooking</div>
+          <div style={activityRowStyle}><Shovel size={12} /> {mining} mining</div>
           <div style={activityRowStyle}><House size={12} /> {depositing} depositing</div>
           <div style={activityRowStyle}><House size={12} /> {world.houses.length} houses total</div>
         </div>
