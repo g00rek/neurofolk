@@ -1,4 +1,4 @@
-import type { Entity, Animal, Tree, House, Position, WorldState, RGB, Traits, LogEntry, Biome, Village, TribeId, DeathCause, Activity, Purpose, Action, Pace } from './types';
+import type { Entity, Animal, Tree, House, Position, WorldState, RGB, Traits, LogEntry, Biome, Village, TribeId, DeathCause, Activity, Purpose, Action, Pace, GoldDeposit } from './types';
 import {
   MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE, TICKS_PER_YEAR,
   PREGNANCY_DURATION, BIRTH_COOLDOWN, INFANT_MORTALITY, MATERNAL_MORTALITY, TICKS_PER_DAY,
@@ -673,7 +673,37 @@ export function createWorld(options: CreateWorldOptions): WorldState {
     }
   }
 
-  return { entities, animals, trees, goldDeposits: [], houses: [], biomes, villages, grass, tick: 0, gridSize, log: [] };
+  // --- Gold deposits ---
+  // Spawn on mountain tiles that have at least one passable neighbor (miners mine from adjacent).
+  const goldDeposits: GoldDeposit[] = [];
+  const mountainCandidates: Position[] = [];
+  for (let y = 0; y < gridSize; y++) {
+    for (let x = 0; x < gridSize; x++) {
+      if (biomes[y][x] !== 'mountain') continue;
+      const hasPassableNeighbor = [
+        { x: x + 1, y }, { x: x - 1, y },
+        { x, y: y + 1 }, { x, y: y - 1 },
+      ].some(n =>
+        n.x >= 0 && n.x < gridSize && n.y >= 0 && n.y < gridSize
+        && isPassable(biomes[n.y][n.x])
+      );
+      if (hasPassableNeighbor) mountainCandidates.push({ x, y });
+    }
+  }
+  const want = scaled(ECONOMY.gold.spawnBase, gridSize, 1);
+  for (let i = mountainCandidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [mountainCandidates[i], mountainCandidates[j]] = [mountainCandidates[j], mountainCandidates[i]];
+  }
+  for (const pos of mountainCandidates.slice(0, want)) {
+    goldDeposits.push({
+      id: generateId('g'),
+      position: pos,
+      remaining: ECONOMY.gold.depositCapacity,
+    });
+  }
+
+  return { entities, animals, trees, goldDeposits, houses: [], biomes, villages, grass, tick: 0, gridSize, log: [] };
 }
 
 // Fighting detection — adult males of different tribes, idle and adjacent, start a fight.
