@@ -142,12 +142,21 @@ export function MapPage() {
           <ParamSlider label="Water %" value={params.waterPct}
             min={0} max={100} step={1}
             onChange={v => updateParam('waterPct', v)} />
+          <ParamSlider label="Water frag" value={params.waterFrag}
+            min={0} max={100} step={1}
+            onChange={v => updateParam('waterFrag', v)} />
           <ParamSlider label="Forest %" value={params.forestPct}
             min={0} max={100} step={1}
             onChange={v => updateParam('forestPct', v)} />
+          <ParamSlider label="Forest frag" value={params.forestFrag}
+            min={0} max={100} step={1}
+            onChange={v => updateParam('forestFrag', v)} />
           <ParamSlider label="Rocks %" value={params.mountainPct}
             min={0} max={100} step={1}
             onChange={v => updateParam('mountainPct', v)} />
+          <ParamSlider label="Rocks frag" value={params.rockFrag}
+            min={0} max={100} step={1}
+            onChange={v => updateParam('rockFrag', v)} />
           <div style={{ fontSize: 12, color: '#9aa4bf', margin: '6px 0' }}>
             Plains: {100 - params.waterPct - params.forestPct - params.mountainPct}%
           </div>

@@ -23,12 +23,19 @@ function smoothNoise(x: number, y: number, scale: number, seed: number): number 
   return nx0 * (1 - fy) + nx1 * fy;
 }
 
-function fbm(x: number, y: number, seed: number): number {
+function fbm(x: number, y: number, seed: number, baseScale: number = 10): number {
   return (
-    smoothNoise(x, y, 10, seed) * 0.5 +
-    smoothNoise(x, y, 5, seed + 100) * 0.3 +
-    smoothNoise(x, y, 3, seed + 200) * 0.2
+    smoothNoise(x, y, baseScale, seed) * 0.5 +
+    smoothNoise(x, y, baseScale / 2, seed + 100) * 0.3 +
+    smoothNoise(x, y, baseScale / 3, seed + 200) * 0.2
   );
+}
+
+/** Convert fragmentation 0-100 to noise scale. 0=one huge blob, 100=many tiny blobs */
+function fragToScale(frag: number, gridSize: number): number {
+  // frag 0 → scale = gridSize (one feature fills whole map)
+  // frag 100 → scale = 2 (tiny scattered blobs)
+  return gridSize * (1 - frag / 100) + 2 * (frag / 100);
 }
 
 // ── Grid helpers ─────────────────────────────────────────────────────
@@ -263,10 +270,12 @@ function carveWaterPatch(grid: Biome[][], needCount: number): Biome[][] {
 // ── Main generation ──────────────────────────────────────────────────
 
 export interface BiomeGenParams {
-  waterPct: number;     // % of total map
-  mountainPct: number;  // % of total map
-  forestPct: number;    // % of total map
-  // plains = 100 - water - forest - rocks
+  waterPct: number;       // % of total map
+  mountainPct: number;    // % of total map
+  forestPct: number;      // % of total map
+  waterFrag: number;      // 0=one big lake, 100=many small ponds
+  forestFrag: number;     // 0=one big forest, 100=many small groves
+  rockFrag: number;       // 0=few big clusters, 100=scattered
   caIterations: number;
   minPocketSize: number;
   borderMargin: number;
@@ -276,6 +285,9 @@ export const DEFAULT_BIOME_PARAMS: BiomeGenParams = {
   waterPct: 20,
   mountainPct: 5,
   forestPct: 30,
+  waterFrag: 30,
+  forestFrag: 30,
+  rockFrag: 50,
   caIterations: 6,
   minPocketSize: 9,
   borderMargin: 2,
@@ -308,17 +320,24 @@ function generateBiomeGridOnce(gridSize: number, p: BiomeGenParams): Biome[][] {
   const total = gridSize * gridSize;
   const h = gridSize, w = gridSize;
 
-  // 1. Generate noise
+  // 1. Generate noise with fragmentation-dependent scale
+  const waterScale = fragToScale(p.waterFrag, gridSize);
+  const forestScale = fragToScale(p.forestFrag, gridSize);
+  const rockScale = fragToScale(p.rockFrag, gridSize);
+
   const elevation: number[][] = [];
   const moisture: number[][] = [];
+  const rockNoise: number[][] = [];
   for (let y = 0; y < h; y++) {
-    const eRow: number[] = [], mRow: number[] = [];
+    const eRow: number[] = [], mRow: number[] = [], rRow: number[] = [];
     for (let x = 0; x < w; x++) {
-      eRow.push(fbm(x, y, seed));
-      mRow.push(fbm(x, y, seed + 500));
+      eRow.push(fbm(x, y, seed, waterScale));
+      mRow.push(fbm(x, y, seed + 500, forestScale));
+      rRow.push(fbm(x, y, seed + 777, rockScale));
     }
     elevation.push(eRow);
     moisture.push(mRow);
+    rockNoise.push(rRow);
   }
 
   // 2. WATER LAYER — generate, smooth, clean up completely first
@@ -416,7 +435,7 @@ function generateBiomeGridOnce(gridSize: number, p: BiomeGenParams): Biome[][] {
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       if (processed[y][x] !== 'plains' || nearWater[y][x] || nearForest[y][x]) continue;
-      availableForRocks.push({ x, y, rockiness: fbm(x, y, seed + 777) });
+      availableForRocks.push({ x, y, rockiness: rockNoise[y][x] });
     }
   // Sort by rockiness descending — highest values cluster together (noise is spatially coherent)
   availableForRocks.sort((a, b) => b.rockiness - a.rockiness);

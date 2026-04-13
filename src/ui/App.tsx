@@ -29,8 +29,6 @@ function loadMapParams(): { gridSize: number; params: BiomeGenParams } {
   return { gridSize: 30, params: { ...DEFAULT_BIOME_PARAMS } };
 }
 
-const MAP_SETTINGS = loadMapParams();
-const WORLD_GRID_SIZE = MAP_SETTINGS.gridSize;
 const INITIAL_ENTITY_COUNT = 4;
 const VILLAGE_COUNT = 1;
 const INITIAL_SPEED = 300;
@@ -54,14 +52,16 @@ function useWindowSize() {
 }
 
 export function App() {
+  const mapSettingsRef = useRef(loadMapParams());
   const initialWorldRef = useRef<WorldState | null>(null);
   const workerRef = useRef<Worker | null>(null);
   if (!initialWorldRef.current) {
+    const ms = mapSettingsRef.current;
     initialWorldRef.current = createWorld({
-      gridSize: WORLD_GRID_SIZE,
+      gridSize: ms.gridSize,
       entityCount: INITIAL_ENTITY_COUNT,
       villageCount: VILLAGE_COUNT,
-      biomeParams: MAP_SETTINGS.params,
+      biomeParams: ms.params,
     });
   }
 
@@ -179,11 +179,12 @@ export function App() {
   }, [world]);
 
   const handleReset = useCallback(() => {
+    const ms = loadMapParams(); // fresh from localStorage
     const nextWorld = createWorld({
-      gridSize: WORLD_GRID_SIZE,
+      gridSize: ms.gridSize,
       entityCount: INITIAL_ENTITY_COUNT,
       villageCount: VILLAGE_COUNT,
-      biomeParams: MAP_SETTINGS.params,
+      biomeParams: ms.params,
     });
     setWorld(nextWorld);
     setRunning(false);
