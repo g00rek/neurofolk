@@ -7,6 +7,7 @@ import {
   HOUSE_CAPACITY,
   HOUSE_WOOD_COST,
   HOUSE_SIZE,
+  VILLAGE_EAT_RANGE,
   TICKS_PER_YEAR,
   ECONOMY,
 } from './types';
@@ -143,7 +144,7 @@ export const ROLES: Record<Gender, RoleConfig> = {
     actions: { gather: 1.0, cook: 1.0, deposit: 1.0, rest: 1.0, play: 1.0 }
   },
   male: {
-    actions: { hunt: 1.0, chop: 0.9, build: 1.0, spar: 1.0, deposit: 1.0, rest: 1.0, play: 1.0 }
+    actions: { hunt: 1.0, chop: 0.9, build: 1.0, deposit: 1.0, rest: 1.0, play: 1.0 }
   },
 };
 
@@ -156,7 +157,6 @@ export type AIAction =
   | { type: 'deposit' }   // go to village stockpile — deposit carrying OR eat from pantry
   | { type: 'go_gather'; target: Position }
   | { type: 'go_cook'; target: Position }
-  | { type: 'go_spar'; target: Position }
   | { type: 'wander' }
   | { type: 'play' };
 
@@ -173,18 +173,18 @@ export interface AIContext {
   nearestForest?: { pos: Position; dist: number };
   villageNeedsHouses: boolean;
   nearestBuildSite?: { pos: Position; dist: number };
-  nearestSparPartner?: { pos: Position; dist: number };  // nearest idle adult male of same tribe
   totalMeat: number;        // raw meat in village stockpile
   totalPlant: number;       // raw fruit in village stockpile
   tribePopulation: number;
   animalPopulation: number;
   gridSize: number;
   daysOfFood: number;       // projected days the stockpile feeds the tribe (∞ if zero eaters)
+  inEatZone: boolean;       // cheb ≤ VILLAGE_EAT_RANGE from stockpile OR any tribe house
 }
 
 // Food-security thresholds (days of stockpile projected against tribe drain).
 // Below PANIC → top priority hunt/gather. Below COMFORT → secondary priority.
-// Above COMFORT → no food-work, men spar/build, women cook/play.
+// Above COMFORT → no food-work, free time for other activities.
 const FOOD_PANIC_DAYS = 15;
 const FOOD_COMFORT_DAYS = 30;
 const FOOD_SURPLUS_DAYS = 60;
@@ -212,9 +212,9 @@ function survivalForageAction(ctx: AIContext, survivalScore: number): AIAction |
     return { type: 'deposit' };
   }
 
-  // Survival mode: pick the CLOSEST food source — fruit tree, stockpile, or animal (males).
-  // Gender doesn't restrict fruit/stockpile here (a starving man WILL grab a berry).
-  // Hunting stays male-only because animals chase = risky for someone barely standing.
+  // Survival mode: pick the CLOSEST food source that actually HAS food.
+  // A starving man will grab a berry; gender doesn't restrict fruit/stockpile here.
+  // Hunting stays male-only (animals flee, risky when barely standing).
   const here = ctx.entity.position;
   const candidates: Array<{ dist: number; action: AIAction }> = [];
 
@@ -224,12 +224,20 @@ function survivalForageAction(ctx: AIContext, survivalScore: number): AIAction |
       action: { type: 'go_gather', target: ctx.nearestEdibleFruit.pos },
     });
   }
-  if (ctx.village?.stockpile) {
-    const sp = ctx.village.stockpile;
-    candidates.push({
-      dist: Math.abs(sp.x - here.x) + Math.abs(sp.y - here.y),
-      action: { type: 'deposit' },
-    });
+  // Stockpile only if it actually has food to eat. Empty stockpile = useless destination;
+  // pushing it anyway traps entity in a "walk to stockpile → idle → walk to stockpile" loop.
+  {
+    const sp = ctx.village?.stockpile;
+    if (ctx.village && sp) {
+      const v = ctx.village;
+      const stockpileFood = v.meatStore + v.plantStore + v.cookedMeatStore + v.driedFruitStore;
+      if (stockpileFood > 0) {
+        candidates.push({
+          dist: Math.abs(sp.x - here.x) + Math.abs(sp.y - here.y),
+          action: { type: 'deposit' },
+        });
+      }
+    }
   }
   if (ctx.entity.gender === 'male'
       && ctx.nearestAnimal
@@ -241,7 +249,11 @@ function survivalForageAction(ctx: AIContext, survivalScore: number): AIAction |
   }
 
   if (candidates.length === 0) {
-    return ctx.nearHome ? undefined : { type: 'wander' };
+    // Panic survival (energy <20) + nothing in sight → wander to search anywhere.
+    // Preemptive survival (energy <60) → return undefined so lower-priority tasks
+    // (cook, play) can run instead of wasting time on a hopeless search.
+    if (survivalScore >= 0.6) return { type: 'wander' };
+    return undefined;
   }
   candidates.sort((a, b) => a.dist - b.dist);
   return candidates[0].action;
@@ -250,12 +262,13 @@ function survivalForageAction(ctx: AIContext, survivalScore: number): AIAction |
 // Survival has three tiers — entities act on hunger BEFORE it becomes critical.
 //   < 20         : 1.0 panic, drops everything (incl. hunt/build) and runs to nearest food.
 //   < threshold  : 0.6 urgent, beats most things but loses to top-tier work like buildHome=1.
-//   < threshold+20: 0.25 preemptive — beats spar/play/cook so entity drifts back to eat.
+//   < threshold+20: 0.25 preemptive — beats play/cook so entity drifts back to eat.
+// Preemptive SKIPS when entity is already in the village eat zone — passive eating (Step 0b)
+// tops them up there. Firing preemptive in-zone would loop entity on stockpile arrivals.
 function scoreSurvival(ctx: AIContext): number {
-  const hungerThreshold = ctx.entity.hungerThreshold ?? HUNGER_THRESHOLD;
   if (ctx.entity.energy < 20) return 1.0;
-  if (ctx.entity.energy < hungerThreshold) return 0.6;
-  if (ctx.entity.energy < hungerThreshold + 20) return 0.25;
+  if (ctx.entity.energy < HUNGER_THRESHOLD) return 0.6;
+  if (ctx.entity.energy < HUNGER_THRESHOLD + 20) return ctx.inEatZone ? 0 : 0.25;
   return 0;
 }
 
@@ -320,24 +333,11 @@ function scoreDeposit(ctx: AIContext): number {
   return 0;
 }
 
-function scoreSpar(ctx: AIContext): number {
-  // Default idle activity for bored males — either approach a partner or loiter in village
-  // waiting for one. Beats play (0.04) so males never sit truly idle.
-  // Cooldown prevents infinite training loops (after each session fighter rests).
-  if (ctx.entity.gender !== 'male') return 0;
-  if (ageInYears(ctx.entity) < CHILD_AGE) return 0;
-  if (ctx.entity.carrying && ctx.entity.carrying.amount > 0) return 0;
-  if (ctx.entity.sparCooldown > 0) return 0;  // resting after recent training
-  if (ctx.nearestSparPartner) return 0.08;
-  if (ctx.homeTarget) return 0.06;
-  return 0;
-}
-
 function scoreCook(ctx: AIContext): number {
   // Cook / dry runs continuously as long as there's any raw meat or raw fruit.
   // Women who aren't urgently foraging (gather has priority when food low) cook to
   // convert raw into higher-energy cooked/dried. Flat 0.5 — doesn't outcompete survival
-  // or deposit but beats spar/play.
+  // or deposit but beats play.
   if (ageInYears(ctx.entity) < CHILD_AGE) return 0;
   if (!ctx.village || !ctx.village.stockpile) return 0;
   if (ctx.entity.carrying && ctx.entity.carrying.amount > 0) return 0; // deposit first
@@ -364,7 +364,6 @@ export function getScores(ctx: AIContext): Record<string, number> {
     gather: scoreGather(ctx),
     deposit: scoreDeposit(ctx),
     cook: scoreCook(ctx),
-    spar: scoreSpar(ctx),
   };
   // Mapping from score-key to role.actions key (some differ in spelling).
   const roleKey: Record<string, string> = {
@@ -445,22 +444,13 @@ export function decideAction(ctx: AIContext): AIAction {
     scores.push({ key: 'cook', score: cookScore, action: () => ({ type: 'go_cook', target: ctx.village!.stockpile! }) });
   }
 
-  // Spar — bored males seek sparring. Target = partner if known, else village hub.
-  const sparScore = scoreSpar(ctx);
-  if (sparScore > 0) {
-    const target = ctx.nearestSparPartner?.pos ?? ctx.homeTarget;
-    if (target) {
-      scores.push({ key: 'spar', score: sparScore, action: () => ({ type: 'go_spar', target }) });
-    }
-  }
-
   // Deposit carrying at stockpile — highest priority when carrying anything
   const depositScore = scoreDeposit(ctx);
   if (depositScore > 0) {
     scores.push({ key: 'deposit', score: depositScore, action: () => ({ type: 'deposit' }) });
   }
 
-  // Default: stroll around settlement (men train when they meet)
+  // Default: stroll around settlement
   scores.push({ key: 'play', score: 0.04, action: () => ({ type: 'play' }) });
 
   // Absolute fallback
@@ -505,6 +495,20 @@ export function buildAIContext(
     manhattan(entity.position, houseCenter(h)) <= NEAR_HOME_RANGE + 1
   );
 
+  // inEatZone: chebyshev ≤ VILLAGE_EAT_RANGE from stockpile OR any tribe house center.
+  // Matches the passive-eating check in world.ts Step 0b.
+  const cheb = (a: Position, b: Position) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+  let inEatZone = false;
+  const village0 = villages.find(v => v.tribe === entity.tribe);
+  if (village0?.stockpile && cheb(entity.position, village0.stockpile) <= VILLAGE_EAT_RANGE) {
+    inEatZone = true;
+  }
+  if (!inEatZone) {
+    for (const h of tribeHouses) {
+      if (cheb(entity.position, houseCenter(h)) <= VILLAGE_EAT_RANGE) { inEatZone = true; break; }
+    }
+  }
+
   // homeTarget: own house center or nearest tribe house center
   let homeTarget: Position | undefined;
   if (entity.homeId) {
@@ -520,7 +524,7 @@ export function buildAIContext(
     }
   }
 
-  const sense = Math.floor(3 + entity.traits.perception * 2);
+  const sense = 7;
 
   // Find nearest animal
   let nearestAnimal: AIContext['nearestAnimal'];
@@ -658,23 +662,6 @@ export function buildAIContext(
     daysOfFood = Infinity;
   }
 
-  // Find nearest sparring partner — adult male, same tribe, idle (not busy or carrying).
-  // Used by males' scoreSpar to seek company when bored.
-  let nearestSparPartner: AIContext['nearestSparPartner'];
-  if (entity.gender === 'male' && ageInYears(entity) >= CHILD_AGE) {
-    for (const other of entities) {
-      if (other.id === entity.id) continue;
-      if (other.gender !== 'male' || other.tribe !== entity.tribe) continue;
-      if (ageInYears(other) < CHILD_AGE) continue;
-      if (other.activity.kind !== 'idle') continue;
-      if (other.carrying && other.carrying.amount > 0) continue;
-      const d = manhattan(entity.position, other.position);
-      if (!nearestSparPartner || d < nearestSparPartner.dist) {
-        nearestSparPartner = { pos: other.position, dist: d };
-      }
-    }
-  }
-
   return {
     entity,
     village,
@@ -687,13 +674,13 @@ export function buildAIContext(
     nearestForest,
     villageNeedsHouses,
     nearestBuildSite,
-    nearestSparPartner,
     totalMeat: village?.meatStore ?? 0,
     totalPlant: village?.plantStore ?? 0,
     tribePopulation,
     animalPopulation: animals.length,
     gridSize,
     daysOfFood,
+    inEatZone,
   };
 }
 
@@ -710,7 +697,6 @@ export function scoreForGoalType(ctx: AIContext, goalType: string): number {
     case 'build': return scoreBuildHome(ctx);
     case 'deposit': return scoreDeposit(ctx);
     case 'cook': return scoreCook(ctx);
-    case 'spar': return scoreSpar(ctx);
     default: return 0;
   }
 }
@@ -722,7 +708,6 @@ function actionToKey(action: AIAction): string {
     case 'go_chop': return 'chop';
     case 'go_build': return 'build';
     case 'go_cook': return 'cook';
-    case 'go_spar': return 'spar';
     case 'deposit': return 'deposit';
     case 'play': return 'play';
     case 'rest': return 'rest';
@@ -781,7 +766,6 @@ export function actionToActivity(action: AIAction, ctx: AIContext, tickNum: numb
     case 'go_chop':  return mk('chop', action.target);
     case 'go_build': return mk('build', action.target);
     case 'go_cook':  return mk('cook', action.target);
-    case 'go_spar':  return mk('spar', action.target);
     case 'deposit': {
       const target = ctx.village?.stockpile;
       if (!target) return undefined;

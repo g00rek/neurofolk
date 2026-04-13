@@ -12,12 +12,8 @@ function avg(entities: Entity[], fn: (e: Entity) => number): string {
 export function TraitAverages({ entities }: TraitAveragesProps) {
   const rows: Array<{ label: string; value: string; color: string }> = [
     { label: 'Strength', value: avg(entities, e => e.traits.strength), color: '#f7768e' },
-    { label: 'Speed', value: avg(entities, e => e.traits.speed), color: '#7aa2f7' },
-    { label: 'Perception', value: avg(entities, e => e.traits.perception), color: '#9ece6a' },
-    { label: 'Metabolism', value: avg(entities, e => e.traits.metabolism), color: '#e0af68' },
-    { label: 'Aggression', value: avg(entities, e => e.traits.aggression), color: '#f7768e' },
-    { label: 'Fertility', value: avg(entities, e => e.traits.fertility), color: '#bb9af7' },
-    { label: 'Twin gene', value: avg(entities, e => e.traits.twinChance * 100) + '%', color: '#73daca' },
+    { label: 'Dexterity', value: avg(entities, e => e.traits.dexterity), color: '#7aa2f7' },
+    { label: 'Intelligence', value: avg(entities, e => e.traits.intelligence), color: '#9ece6a' },
   ];
 
   return (

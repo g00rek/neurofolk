@@ -15,18 +15,13 @@ function makeEntity(overrides: Partial<Entity> = {}): Entity {
     color: [100, 100, 100],
     energy: 80,
     traits: {
-      strength: 5,
-      speed: 1,
-      perception: 2,
-      metabolism: 1.0,
-      aggression: 3,
-      fertility: 1.0,
-      twinChance: 0,
+      strength: 50,
+      dexterity: 50,
+      intelligence: 50,
     },
     tribe: 0,
     birthCooldown: 0,
     pregnancyTimer: 0,
-    sparCooldown: 0,
     ...overrides,
   };
 }
@@ -52,6 +47,7 @@ function makeContext(overrides: Partial<AIContext> = {}): AIContext {
     animalPopulation: 30,
     gridSize: 30,
     daysOfFood: 60,
+    inEatZone: true,
     ...overrides,
   };
 }
@@ -91,13 +87,9 @@ describe('decideAction gather behavior', () => {
     const entity = makeEntity({
       position: { x: 5, y: 5 },
       traits: {
-        strength: 5,
-        speed: 1,
-        perception: 1,
-        metabolism: 1.0,
-        aggression: 3,
-        fertility: 1.0,
-        twinChance: 0,
+        strength: 50,
+        dexterity: 50,
+        intelligence: 50,
       },
     });
     const village = {
@@ -244,7 +236,7 @@ describe('hysteresis re-evaluation', () => {
       nearestAnimal: { pos: { x: 6, y: 5 }, dist: 1 },
       daysOfFood: 10,
     });
-    const result = shouldReEvaluate(ctx, 'spar', 0, 20);
+    const result = shouldReEvaluate(ctx, 'chop', 0, 20);
     expect(result.interrupt).toBe(true);
     expect(result.newActivity).toBeDefined();
   });

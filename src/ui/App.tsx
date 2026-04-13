@@ -13,7 +13,7 @@ import { TICKS_PER_YEAR, RUNTIME_CONFIG, loadRuntimeConfig } from '../engine/typ
 
 // Load persisted RUNTIME_CONFIG before world creation (sliders set on /animals page).
 loadRuntimeConfig();
-import { BowlFood, Leaf, Axe } from '@phosphor-icons/react';
+import { BowlFood, Leaf, Axe, MagnifyingGlassPlus, MagnifyingGlassMinus } from '@phosphor-icons/react';
 
 import { DEFAULT_BIOME_PARAMS } from '../engine/biomes';
 import type { BiomeGenParams } from '../engine/biomes';
@@ -77,6 +77,7 @@ export function App() {
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState(INITIAL_SPEED);
   const [skipping, setSkipping] = useState<{ ticks: number; startedAt: number } | null>(null);
+  const [zoomed, setZoomed] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedTile, setSelectedTile] = useState<Position | null>(null);
   const [overlayPos, setOverlayPos] = useState<{ x: number; y: number } | null>(null);
@@ -88,7 +89,10 @@ export function App() {
   const PAD = isDesktop ? 16 : 12;
   const availableW = isDesktop ? winW - SIDEBAR_W - PAD * 2 - 32 : winW - PAD * 2;
   const availableH = winH - 120; // header + controls
-  const mapSize = Math.min(availableW, availableH, isDesktop ? 9999 : 600);
+  // Default view: fit map to height. Zoomed: fill available width (can scroll vertically).
+  const mapSize = isDesktop && zoomed
+    ? availableW
+    : Math.min(availableW, availableH, isDesktop ? 9999 : 600);
   const graphW = isDesktop ? SIDEBAR_W - 26 : mapSize - 20;
 
   const extinct = world.entities.length === 0 && world.tick > 0;
@@ -235,16 +239,27 @@ export function App() {
   const woodPct = v ? Math.min(100, Math.round((v.woodStore / 30) * 100)) : 0;
 
   const header = (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <div style={stickyHeaderStyle}>
       <h1 style={{ margin: 0, fontSize: '18px', color: '#ccc' }}>Neurofolk</h1>
-      <Controls
-        running={running}
-        speed={speed}
-        onToggle={() => setRunning(r => !r)}
-        onSpeedChange={setSpeed}
-        onReset={handleReset}
-        onSkip={handleSkip}
-      />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <Controls
+          running={running}
+          speed={speed}
+          onToggle={() => setRunning(r => !r)}
+          onSpeedChange={setSpeed}
+          onReset={handleReset}
+          onSkip={handleSkip}
+        />
+        {isDesktop && (
+          <button
+            onClick={() => setZoomed(z => !z)}
+            style={zoomBtnStyle}
+            title={zoomed ? 'Fit to screen' : 'Zoom — fill width'}
+          >
+            {zoomed ? <MagnifyingGlassMinus size={14} /> : <MagnifyingGlassPlus size={14} />}
+          </button>
+        )}
+      </div>
     </div>
   );
 
@@ -426,6 +441,30 @@ const desktopContainerStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: '8px',
+};
+
+const stickyHeaderStyle: React.CSSProperties = {
+  position: 'sticky',
+  top: 0,
+  zIndex: 500,
+  background: '#16161e',
+  padding: '8px 0',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  borderBottom: '1px solid #2d3346',
+};
+
+const zoomBtnStyle: React.CSSProperties = {
+  background: '#7aa2f733',
+  color: '#7aa2f7',
+  border: '1px solid #7aa2f755',
+  padding: '4px 8px',
+  borderRadius: '4px',
+  fontSize: '14px',
+  cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'center',
 };
 
 const mobileContainerStyle: React.CSSProperties = {

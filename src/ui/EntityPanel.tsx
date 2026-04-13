@@ -52,7 +52,7 @@ function formatDuration(ticks: number): string {
 }
 import { ageInYears } from '../engine/world';
 import { buildAIContext, getScores, decideAction } from '../engine/utility-ai';
-import { Axe, CookingPot, GenderFemale, GenderMale, Hammer, House, Leaf, PersonSimpleRun, ShieldWarning, Sword, Baby } from '@phosphor-icons/react';
+import { Axe, CookingPot, GenderFemale, GenderMale, Hammer, House, Leaf, PersonSimpleRun, Sword, Baby } from '@phosphor-icons/react';
 
 interface EntityPanelProps {
   entity: Entity;
@@ -113,37 +113,17 @@ export function EntityPanel({ entity, world, onClose }: EntityPanelProps) {
       <div style={rowStyle}>
         <span style={dimStyle}>Strength:</span>
         <span>{entity.traits.strength}</span>
-        <Bar value={entity.traits.strength} max={10} color="#f7768e" />
+        <Bar value={entity.traits.strength} max={100} color="#f7768e" />
       </div>
       <div style={rowStyle}>
-        <span style={dimStyle}>Speed:</span>
-        <span>{entity.traits.speed}</span>
-        <Bar value={entity.traits.speed} max={3} color="#7aa2f7" />
+        <span style={dimStyle}>Dexterity:</span>
+        <span>{entity.traits.dexterity}</span>
+        <Bar value={entity.traits.dexterity} max={100} color="#7aa2f7" />
       </div>
       <div style={rowStyle}>
-        <span style={dimStyle}>Perception:</span>
-        <span>{entity.traits.perception}</span>
-        <Bar value={entity.traits.perception} max={5} color="#9ece6a" />
-      </div>
-      <div style={rowStyle}>
-        <span style={dimStyle}>Metabolism:</span>
-        <span>{entity.traits.metabolism}</span>
-        <Bar value={entity.traits.metabolism} max={2} color="#e0af68" />
-      </div>
-      <div style={rowStyle}>
-        <span style={dimStyle}>Aggression:</span>
-        <span>{entity.traits.aggression}</span>
-        <Bar value={entity.traits.aggression} max={10} color="#f7768e" />
-      </div>
-      <div style={rowStyle}>
-        <span style={dimStyle}>Fertility:</span>
-        <span>{entity.traits.fertility}</span>
-        <Bar value={entity.traits.fertility} max={2} color="#bb9af7" />
-      </div>
-      <div style={rowStyle}>
-        <span style={dimStyle}>Twin gene:</span>
-        <span>{Math.round(entity.traits.twinChance * 100)}%</span>
-        <Bar value={entity.traits.twinChance} max={0.5} color="#73daca" />
+        <span style={dimStyle}>Intelligence:</span>
+        <span>{entity.traits.intelligence}</span>
+        <Bar value={entity.traits.intelligence} max={100} color="#9ece6a" />
       </div>
       <div style={rowStyle}>
         <span style={dimStyle}>Tribe:</span>
@@ -205,7 +185,6 @@ const WORKING_LABEL: Record<Action, ReactNode> = {
   chopping:  <span style={stateIconRowStyle}><Axe size={12} />Chopping</span>,
   building:  <span style={stateIconRowStyle}><Hammer size={12} />Building</span>,
   cooking:   <span style={stateIconRowStyle}><CookingPot size={12} />Cooking</span>,
-  training:  <span style={stateIconRowStyle}><ShieldWarning size={12} />Training</span>,
   fighting:  <span style={stateIconRowStyle}><Sword size={12} />Fighting</span>,
 };
 
@@ -215,7 +194,6 @@ const MOVING_LABEL: Record<Purpose, ReactNode> = {
   chop:    <span style={stateIconRowStyle}><Axe size={12} />Going to chop</span>,
   build:   <span style={stateIconRowStyle}><Hammer size={12} />Going to build</span>,
   cook:    <span style={stateIconRowStyle}><CookingPot size={12} />Going to cook</span>,
-  spar:    <span style={stateIconRowStyle}><ShieldWarning size={12} />Going to spar</span>,
   deposit: <span style={stateIconRowStyle}><House size={12} />Going to stockpile</span>,
 };
 

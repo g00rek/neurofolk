@@ -12,7 +12,7 @@ const CATEGORY_TYPES: Record<Category, LogEventType[] | 'all'> = {
   all:    'all',
   food:   ['hunt', 'gather', 'chop'],                       // resource gathering
   life:   ['birth', 'death', 'pregnant'],                   // reproduction + mortality
-  combat: ['fight', 'train'],                               // combat + sparring
+  combat: ['fight'],                                        // combat
   build:  ['build_start', 'build_done', 'house_claimed'],   // housing
 };
 const CATEGORY_LABEL: Record<Category, string> = {
@@ -43,7 +43,6 @@ const EVENT_COLOR: Record<LogEventType, string> = {
   build_start: '#7aa2f7',
   build_done: '#7aa2f7',
   fight: '#ff9e64',
-  train: '#c0caf5',
   house_claimed: '#7dcfff',
 };
 
@@ -57,7 +56,6 @@ const EVENT_ICON: Record<LogEventType, string> = {
   build_start: '🔨',
   build_done: '🏠',
   fight: '⚔️',
-  train: '🗡️',
   house_claimed: '🏡',
 };
 
@@ -84,8 +82,6 @@ function formatEntry(entry: LogEntry): string {
       return `${name} ${entry.detail ?? 'finished building'}`;
     case 'fight':
       return `${name} started fighting${entry.detail ? ` ${entry.detail}` : ''}`;
-    case 'train':
-      return `${name} is training${entry.detail ? ` ${entry.detail}` : ''}`;
     case 'house_claimed':
       return `${name} claimed a house`;
     default:

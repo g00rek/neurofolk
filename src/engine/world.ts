@@ -3,7 +3,7 @@ import {
   MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE, TICKS_PER_YEAR,
   PREGNANCY_DURATION, BIRTH_COOLDOWN, INFANT_MORTALITY, MATERNAL_MORTALITY, TICKS_PER_DAY,
   ENERGY_MAX, ENERGY_START, ENERGY_DRAIN_INTERVAL, ENERGY_MEAT, ENERGY_PLANT,
-  HUNGER_THRESHOLD, CHILD_AGE, TRAIT_ENERGY_COST,
+  HUNGER_THRESHOLD, CHILD_AGE,
   ANIMAL_COUNT, scaled,
   FIGHT_MIN_AGE, MEAT_PORTIONS_PER_HUNT, TREE_FRUIT_PORTIONS,
   ANIMAL_REPRO_INTERVAL, FOREST_SPEED_PENALTY,
@@ -31,11 +31,13 @@ function generateId(prefix = 'e'): string {
   return `${prefix}-${nextId++}`;
 }
 
-function randomMaxAge(fertility: number = 1.0): number {
-  // Higher fertility = shorter life (trade-off)
-  const baseAge = 45 + Math.floor(Math.random() * 16); // 45-60
-  const adjusted = Math.round(baseAge / fertility);
-  return clamp(adjusted, 30, 75) * TICKS_PER_YEAR;
+// How far entities can "see" for AI purposes (hunt retarget, nearest-fruit, etc.).
+const SIGHT_RANGE = 7;
+
+function randomMaxAge(): number {
+  // 45-60 years, random per entity.
+  const years = 45 + Math.floor(Math.random() * 16);
+  return years * TICKS_PER_YEAR;
 }
 
 export function ageInYears(e: Entity): number {
@@ -47,12 +49,8 @@ function isReproductive(e: Entity): boolean {
   return years >= MIN_REPRODUCTIVE_AGE && years <= MAX_REPRODUCTIVE_AGE;
 }
 
-function personalHungerThreshold(e: Entity): number {
-  return e.hungerThreshold ?? HUNGER_THRESHOLD;
-}
-
 function isHungry(e: Entity): boolean {
-  return e.energy < personalHungerThreshold(e);
+  return e.energy < HUNGER_THRESHOLD;
 }
 
 function isChild(e: Entity): boolean {
@@ -123,10 +121,6 @@ function isAtHome(e: Entity, houses: House[]): boolean {
 
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
-}
-
-function randomHungerThreshold(): number {
-  return HUNGER_THRESHOLD - 8 + Math.floor(Math.random() * 17); // 32..48 around baseline 40
 }
 
 // ── Goal arrival resolvers ──────────────────────────────────────────
@@ -270,26 +264,6 @@ function completeCooking(entity: Entity, getVillage: GetVillageFn, logEvent: Log
   return { ...entity, activity: IDLE, energy: Math.max(0, entity.energy - 4) };
 }
 
-function completeTraining(entity: Entity): Entity {
-  // Random stat boost
-  const boosted = { ...entity.traits };
-  const roll = Math.random();
-  if (roll < 0.5) {
-    boosted.strength = Math.min(10, +(boosted.strength + 0.3).toFixed(1));
-  } else if (roll < 0.8) {
-    boosted.speed = Math.min(3, +(boosted.speed + 0.1).toFixed(1));
-  } else {
-    boosted.perception = Math.min(5, +(boosted.perception + 0.2).toFixed(1));
-  }
-  return {
-    ...entity,
-    activity: IDLE,
-    energy: Math.max(0, entity.energy - 5),
-    traits: boosted,
-    sparCooldown: ECONOMY.sparring.cooldownTicks,
-  };
-}
-
 function completeFighting(entity: Entity): Entity {
   // Fight outcome (who dies) resolved at start via paired detection — here just energy cost.
   return { ...entity, activity: IDLE, energy: Math.max(0, entity.energy - 20) };
@@ -310,8 +284,7 @@ function depositCarrying(entity: Entity, getVillage: GetVillageFn): Entity {
 function eatDirectlyToThreshold(entity: Entity, portionEnergy: number, availablePortions: number): { entity: Entity; remainingPortions: number } {
   let remaining = availablePortions;
   let energy = entity.energy;
-  const threshold = personalHungerThreshold(entity);
-  while (remaining > 0 && energy < threshold) {
+  while (remaining > 0 && energy < HUNGER_THRESHOLD) {
     energy = Math.min(ENERGY_MAX, energy + portionEnergy);
     remaining--;
   }
@@ -320,55 +293,41 @@ function eatDirectlyToThreshold(entity: Entity, portionEnergy: number, available
 }
 
 function randomTraits(): Traits {
+  // Spawn range 30-70 (center of 0-100 scale). Evolution does the rest.
+  const pick = () => 30 + Math.floor(Math.random() * 41);
   return {
-    strength: Math.floor(Math.random() * 5) + 3,           // 3-7
-    speed: Math.floor(Math.random() * 2) + 1,               // 1-2
-    perception: Math.floor(Math.random() * 3) + 1,          // 1-3
-    metabolism: +(0.8 + Math.random() * 0.4).toFixed(2),     // 0.8-1.2
-    aggression: Math.floor(Math.random() * 4) + 1,          // 1-4 (low start, evolution decides)
-    fertility: +(0.8 + Math.random() * 0.4).toFixed(2),     // 0.8-1.2
-    twinChance: +(Math.random() * 0.1).toFixed(2),         // 0-0.1 (low on start)
+    strength: pick(),
+    dexterity: pick(),
+    intelligence: pick(),
   };
 }
 
-function inheritTrait(a: number, b: number, min: number, max: number, mutation: number): number {
+function inheritTrait(a: number, b: number, mutation: number): number {
   const avg = (a + b) / 2;
-  return clamp(+(avg + (Math.random() * mutation * 2 - mutation)).toFixed(2), min, max);
+  return clamp(Math.round(avg + (Math.random() * mutation * 2 - mutation)), 0, 100);
 }
 
 function inheritTraits(a: Traits, b: Traits): Traits {
-  // Rare dramatic mutation: 3% chance of one trait being extreme
   const dramaticMutation = Math.random() < 0.03;
+  const MUTATION = 6; // ±6 points on 0-100 scale per trait
   const traits: Traits = {
-    strength: inheritTrait(a.strength, b.strength, 1, 10, 1),
-    speed: inheritTrait(a.speed, b.speed, 1, 3, 0.3),
-    perception: inheritTrait(a.perception, b.perception, 1, 5, 0.7),
-    metabolism: inheritTrait(a.metabolism, b.metabolism, 0.5, 2.0, 0.1),
-    aggression: inheritTrait(a.aggression, b.aggression, 0, 10, 1),
-    fertility: inheritTrait(a.fertility, b.fertility, 0.5, 2.0, 0.1),
-    twinChance: inheritTrait(a.twinChance, b.twinChance, 0, 0.5, 0.05),
+    strength: inheritTrait(a.strength, b.strength, MUTATION),
+    dexterity: inheritTrait(a.dexterity, b.dexterity, MUTATION),
+    intelligence: inheritTrait(a.intelligence, b.intelligence, MUTATION),
   };
-  traits.strength = Math.round(traits.strength);
-  traits.speed = Math.round(traits.speed);
-  traits.perception = Math.round(traits.perception);
-  traits.aggression = Math.round(traits.aggression);
-
   if (dramaticMutation) {
-    const traitKeys: (keyof Traits)[] = ['strength', 'speed', 'perception', 'aggression'];
-    const key = traitKeys[Math.floor(Math.random() * traitKeys.length)];
-    const maxVals: Record<string, number> = { strength: 10, speed: 3, perception: 5, aggression: 10 };
-    // Push to extreme (high or low)
-    traits[key] = Math.random() < 0.5 ? 1 : maxVals[key];
+    const keys: (keyof Traits)[] = ['strength', 'dexterity', 'intelligence'];
+    const key = keys[Math.floor(Math.random() * keys.length)];
+    traits[key] = Math.random() < 0.5 ? 0 : 100;
   }
-
   return traits;
 }
 
-function traitEnergyDrain(t: Traits): number {
-  // Higher strength/speed/perception cost energy, metabolism reduces drain
-  const total = t.strength + t.speed * 3 + t.perception;
-  const baseline = 3 + 3 + 1;
-  return Math.max(0, (total - baseline) * TRAIT_ENERGY_COST * t.metabolism);
+// Steps per tick from dexterity (0-33 → 1, 34-66 → 2, 67-100 → 3).
+function dexToSteps(dex: number): number {
+  if (dex >= 67) return 3;
+  if (dex >= 34) return 2;
+  return 1;
 }
 
 // Fight: higher strength = higher win chance (weighted random)
@@ -640,7 +599,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
         gender,
         activity: IDLE,
         age: (MIN_REPRODUCTIVE_AGE + Math.floor(Math.random() * 10)) * TICKS_PER_YEAR,
-        maxAge: randomMaxAge(traits.fertility),
+        maxAge: randomMaxAge(),
         color: [
           50 + Math.floor(Math.random() * 206),
           50 + Math.floor(Math.random() * 206),
@@ -648,10 +607,9 @@ export function createWorld(options: CreateWorldOptions): WorldState {
         ] as RGB,
         energy: ENERGY_START,
         traits,
-        hungerThreshold: randomHungerThreshold(),
         tribe,
         birthCooldown: 0,
-        pregnancyTimer: 0, sparCooldown: 0,
+        pregnancyTimer: 0,
       });
     }
   }
@@ -717,8 +675,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
   return { entities, animals, trees, houses: [], biomes, villages, grass, tick: 0, gridSize, log: [] };
 }
 
-// Fighting & training detection — adult males who are idle and adjacent.
-// Cross-tribe aggressive pair → fighting. Same-tribe pair near village → training.
+// Fighting detection — adult males of different tribes, idle and adjacent, start a fight.
 function detectInteractions(
   entities: Entity[],
   _gridSize: number,
@@ -727,68 +684,46 @@ function detectInteractions(
   log?: LogEntry[],
   tickNum?: number,
 ): Entity[] {
-  const newActionIds = new Set<string>();
+  const fighterIds = new Set<string>();
 
   const activeMales = entities.filter(e =>
     e.gender === 'male' && isIdle(e)
     && ageInYears(e) >= FIGHT_MIN_AGE && !isAtHome(e, houses)
   );
 
-  let fightStarted = false;
-  for (let i = 0; i < activeMales.length - 1 && !fightStarted; i++) {
-    for (let j = i + 1; j < activeMales.length && !fightStarted; j++) {
+  for (let i = 0; i < activeMales.length - 1; i++) {
+    for (let j = i + 1; j < activeMales.length; j++) {
       const m1 = activeMales[i];
       const m2 = activeMales[j];
       if (manhattan(m1.position, m2.position) > 1) continue;
       if (m1.tribe !== m2.tribe) {
-        if (Math.random() < m1.traits.aggression / 10 && Math.random() < m2.traits.aggression / 10) {
-          newActionIds.add(m1.id);
-          newActionIds.add(m2.id);
-          fightStarted = true;
-        }
+        fighterIds.add(m1.id);
+        fighterIds.add(m2.id);
       }
     }
-  }
-
-  if (!fightStarted) {
-    const trulyIdle = activeMales.filter(e =>
-      !newActionIds.has(e.id) && isNearTribeHouses(e.position, e.tribe, houses)
-    );
-    for (let i = 0; i < trulyIdle.length - 1; i++) {
-      for (let j = i + 1; j < trulyIdle.length; j++) {
-        if (trulyIdle[i].tribe === trulyIdle[j].tribe
-          && manhattan(trulyIdle[i].position, trulyIdle[j].position) <= 1) {
-          newActionIds.add(trulyIdle[i].id);
-          newActionIds.add(trulyIdle[j].id);
-          break;
-        }
-      }
-      if (newActionIds.size > 0) break;
-    }
+    if (fighterIds.size > 0) break;
   }
 
   const loggedPairs = new Set<string>();
   return entities.map(e => {
-    if (!newActionIds.has(e.id)) return e;
+    if (!fighterIds.has(e.id)) return e;
     const otherMale = entities.find(o =>
-      o.id !== e.id && o.gender === 'male' && newActionIds.has(o.id)
+      o.id !== e.id && o.gender === 'male' && fighterIds.has(o.id)
       && manhattan(e.position, o.position) <= 1
     );
-    if (e.gender === 'male' && otherMale) {
-      const isFight = otherMale.tribe !== e.tribe;
+    if (otherMale) {
       if (log && tickNum != null) {
         const pairKey = [e.id, otherMale.id].sort().join(':');
         if (!loggedPairs.has(pairKey)) {
           loggedPairs.add(pairKey);
           log.push({
-            tick: tickNum,
-            type: isFight ? 'fight' : 'train',
+            tick: tickNum, type: 'fight',
             entityId: e.id, name: e.name, gender: e.gender, age: e.age,
-            detail: isFight ? `vs ${otherMale.name}` : `with ${otherMale.name}`,
+            detail: `vs ${otherMale.name}`,
           });
         }
       }
-      return { ...e, activity: startWork(isFight ? 'fighting' : 'training') };
+      return { ...e, activity: startWork('fighting') };
     }
     return e;
   });
@@ -830,11 +765,12 @@ function pheromoneMating(entities: Entity[], villages: Village[], _houses: House
       const dist = manhattan(male.position, female.position);
       if (dist > range) continue;
 
-      const matingChance = male.traits.strength / 20;
+      // strength 0-100 → chance 0%-50% per adjacent-female check.
+      const matingChance = male.traits.strength / 200;
       if (Math.random() >= matingChance) continue;
 
       // Pregnancy runs in parallel with activity — woman keeps doing whatever she was doing.
-      const pregTime = Math.max(3, Math.round(PREGNANCY_DURATION / female.traits.fertility));
+      const pregTime = PREGNANCY_DURATION;
       updated[fi] = {
         ...female,
         pregnancyTimer: pregTime,
@@ -921,7 +857,6 @@ export function tick(state: WorldState): WorldState {
       age: e.age + 1,
       birthCooldown: Math.max(0, e.birthCooldown - 1),
       pregnancyTimer: Math.max(0, e.pregnancyTimer - 1),
-      sparCooldown: Math.max(0, e.sparCooldown - 1),
     };
     // Metabolism:
     //   infants (< infantAgeYears): breastfed — no drain, no eating
@@ -929,7 +864,7 @@ export function tick(state: WorldState): WorldState {
     //   adults (CHILD_AGE+): full drain, full eating
     //   homeless in winter: 2× drain (cold exposure — incentive to build houses in time)
     if (!isInfant(a) && a.age % ENERGY_DRAIN_INTERVAL === 0) {
-      const baseDrain = 1 + traitEnergyDrain(a.traits);
+      const baseDrain = 1;
       const hungerMod = isHungry(a) ? 0.5 : 1.0;
       const ageMod = isChild(a) ? ECONOMY.reproduction.childDrainMultiplier : 1.0;
       const winterMod = (isWinter && !a.homeId) ? 2.0 : 1.0;
@@ -997,18 +932,11 @@ export function tick(state: WorldState): WorldState {
     if (!wasPregnant || stillPregnant) continue;
 
     // Birth happens — mother keeps her current state/goal; new baby spawns at her home.
+    // Always single birth (no twinChance — removed).
     const dadTraits = mother.fatherTraits ?? mother.traits;
-    const tc = mother.traits.twinChance;
-    let babyCount = 1;
-    if (Math.random() < tc) {
-      const roll = Math.random();
-      if (roll < 0.7) babyCount = 2;
-      else if (roll < 0.92) babyCount = 3;
-      else babyCount = 4;
-    }
     const birthHome = homePosition(mother, houses);
     const birthPos = birthHome ? { ...birthHome } : { ...mother.position };
-    for (let b = 0; b < babyCount; b++) {
+    {
       const babyTraits = inheritTraits(dadTraits, mother.traits);
       const babyGender = Math.random() < 0.5 ? 'male' : 'female' as const;
       const baby: Entity = {
@@ -1018,13 +946,12 @@ export function tick(state: WorldState): WorldState {
         gender: babyGender,
         activity: IDLE,
         age: 0,
-        maxAge: randomMaxAge(babyTraits.fertility),
+        maxAge: randomMaxAge(),
         color: [...mother.color] as RGB,
         energy: ENERGY_START,
         traits: babyTraits,
-        hungerThreshold: randomHungerThreshold(),
         birthCooldown: 0,
-        pregnancyTimer: 0, sparCooldown: 0,
+        pregnancyTimer: 0,
         tribe: (mother.fatherTribe === mother.tribe ? mother.tribe : (Math.random() < 0.5 ? mother.tribe : mother.fatherTribe!)) as TribeId,
         homeId: birthHome ? mother.homeId : undefined,
         motherId: mother.id,
@@ -1083,7 +1010,6 @@ export function tick(state: WorldState): WorldState {
       case 'cooking':   return completeCooking(e, getVillage, logEvent);
       case 'hunting':   return completeHunting(e, animals, logEvent);
       case 'gathering': return completeGathering(e, trees);
-      case 'training':  return completeTraining(e);
       case 'fighting':  return completeFighting(e);
     }
   });
@@ -1173,6 +1099,21 @@ export function tick(state: WorldState): WorldState {
       const action = decideAction(ctx);
       const newActivity = actionToActivity(action, ctx, tickNum);
       if (newActivity) {
+        // Live-update precomputed build stats so subsequent entities in the same
+        // tick don't also pick 'build'. Without this, pre.housesInProgressByTribe
+        // is frozen at tick start and two men target the same bestBuildSite.
+        if (newActivity.kind === 'moving' && newActivity.purpose === 'build') {
+          const tribe = entity.tribe;
+          const inProgress = (pre.housesInProgressByTribe.get(tribe) ?? 0) + 1;
+          pre.housesInProgressByTribe.set(tribe, inProgress);
+          const freeSlots = pre.freeSlotsByTribe.get(tribe) ?? 0;
+          const homeless = pre.homelessByTribe.get(tribe) ?? 0;
+          const pregnant = pre.pregnantByTribe.get(tribe) ?? 0;
+          pre.villageNeedsHousesByTribe.set(
+            tribe,
+            (homeless + pregnant) > (freeSlots + inProgress * HOUSE_CAPACITY),
+          );
+        }
         entity = { ...entity, activity: newActivity };
         entities[idx] = entity;
       } else {
@@ -1193,9 +1134,9 @@ export function tick(state: WorldState): WorldState {
     // Must be moving from here on.
     if (entity.activity.kind !== 'moving') continue;
 
-    // Hunt re-targeting: chase the nearest visible animal within perception range.
+    // Hunt re-targeting: chase the nearest visible animal within sight range.
     if (entity.activity.purpose === 'hunt') {
-      const sense = Math.floor(3 + entity.traits.perception * 2);
+      const sense = SIGHT_RANGE;
       let closest: Animal | undefined;
       let closestDist = Infinity;
       for (const a of animals) {
@@ -1211,13 +1152,14 @@ export function tick(state: WorldState): WorldState {
     // Walk / run toward target. Running doubles step count; forest forces walk.
     if (entity.activity.kind !== 'moving') continue;
     const inForest = biomes[entity.position.y][entity.position.x] === 'forest';
-    const baseSpeed = Math.max(1, entity.traits.speed - (inForest ? FOREST_SPEED_PENALTY : 0));
+    const dexSteps = dexToSteps(entity.traits.dexterity);
+    const baseSpeed = Math.max(1, dexSteps - (inForest ? FOREST_SPEED_PENALTY : 0));
     const startPace = entity.activity.pace;
     const effectivePace: Pace = inForest ? 'walk' : startPace;
     const steps = effectivePace === 'run' ? baseSpeed * 2 : baseSpeed;
 
     // Arrival: structure/social targets stop adjacent; other targets require exact tile.
-    const structureStop = (p: Purpose) => p === 'deposit' || p === 'cook' || p === 'spar';
+    const structureStop = (p: Purpose) => p === 'deposit' || p === 'cook';
 
     for (let step = 0; step < steps; step++) {
       if (entity.activity.kind !== 'moving') break;
@@ -1249,7 +1191,6 @@ export function tick(state: WorldState): WorldState {
         case 'chop':    entity = resolveChopArrival(entity, trees, biomes); break;
         case 'build':   entity = resolveBuildArrival(entity, biomes, gridSize, houses, updatedVillages, getVillage); break;
         case 'cook':    entity = resolveCookArrival(entity, getVillage); break;
-        case 'spar':    entity = { ...entity, activity: IDLE }; break; // sparring fires via detectInteractions
         case 'deposit': entity = depositCarrying({ ...entity, activity: IDLE }, getVillage); break;
       }
       entities[idx] = entity;
@@ -1556,11 +1497,11 @@ export function tick(state: WorldState): WorldState {
     }
   }
 
-  // --- Step 8: Children stick to mother (end-of-tick, after all adult movement).
-  //   Infants (< 1yr) are CARRIED — snap to mother's tile.
-  //   Toddlers (1..CHILD_AGE) walk — one BFS step toward mother; adjacent → stay.
-  // Orphans (motherId missing or mother dead): fall back to village stockpile so
-  // they don't starve alone in the wilderness.
+  // --- Step 8: Children stay around mother (end-of-tick, after all adult movement).
+  //   Infants (< 1yr) CARRIED — snap to mother's tile.
+  //   Toddlers (1..CHILD_AGE) play randomly, but if they wander beyond CHILD_WANDER_RADIUS
+  //   they take one step back toward mother. Orphans (no mother) drift to stockpile.
+  const CHILD_WANDER_RADIUS = 3;
   entities = entities.map(e => {
     if (!isChild(e)) return e;
     const mother = e.motherId ? entities.find(m => m.id === e.motherId) : undefined;
@@ -1570,10 +1511,17 @@ export function tick(state: WorldState): WorldState {
     if (isInfant(e)) {
       return { ...e, position: { ...target }, activity: IDLE };
     }
-    if (manhattan(e.position, target) <= 1) return e;
-    const next = stepToward(e.position, target, biomes, gridSize, blockedTiles);
-    if (!next || (next.x === e.position.x && next.y === e.position.y)) return e;
-    return { ...e, position: next, activity: IDLE };
+    const d = manhattan(e.position, target);
+    if (d > CHILD_WANDER_RADIUS) {
+      const back = stepToward(e.position, target, biomes, gridSize, blockedTiles);
+      if (!back || (back.x === e.position.x && back.y === e.position.y)) return e;
+      return { ...e, position: back, activity: IDLE };
+    }
+    // Within radius — random playful step. Occasionally (30%) stay put.
+    if (Math.random() < 0.3) return e;
+    const step = randomStepBiome(e.position, gridSize, biomes, blockedTiles);
+    if (step.x === e.position.x && step.y === e.position.y) return e;
+    return { ...e, position: step, activity: IDLE };
   });
 
   const fullLog = [...state.log, ...log];

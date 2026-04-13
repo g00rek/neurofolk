@@ -354,11 +354,10 @@ function makeTestHuman(pos: Position, idx: number): Entity {
     maxAge: 100 * TICKS_PER_YEAR,
     color: [220, 60, 60],
     energy: 100,
-    traits: { strength: 5, speed: 1, perception: 3, metabolism: 1.0, aggression: 0, fertility: 1.0, twinChance: 0 },
+    traits: { strength: 50, dexterity: 50, intelligence: 50 },
     tribe: 0,
     birthCooldown: 0,
     pregnancyTimer: 0,
-    sparCooldown: 0,
   };
 }
 

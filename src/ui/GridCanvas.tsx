@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import type { WorldState, Entity, Village } from '../engine/types';
-import { CHILD_AGE, TICKS_PER_DAY, TICKS_PER_YEAR, RUNTIME_CONFIG } from '../engine/types';
+import { CHILD_AGE, TICKS_PER_DAY, TICKS_PER_YEAR, RUNTIME_CONFIG, ECONOMY } from '../engine/types';
 import { ageInYears } from '../engine/world';
 import { drawSurfaceLayer, drawWaterLayer, drawTreeLayer, drawGrassLayer } from './terrain/renderer';
 import type { Season } from './terrain/renderer';
@@ -45,6 +45,11 @@ const PERSON_SY: Record<string, number> = {
   'female-0': 96, 'female-1': 128, 'female-2': 120,
 };
 
+// Children have their own row in Units.png (Y=592). They only run (no walk animation).
+const CHILD_IDLE_SX = [24, 32, 40];
+const CHILD_RUN_SX  = [80, 88, 96, 104];
+const CHILD_SY = 592;
+
 const TRIBE_COLORS: Record<number, [number, number, number]> = {
   0: [220, 60, 60],   // Red
   1: [60, 100, 220],  // Blue
@@ -59,17 +64,6 @@ function entityColor(entity: Entity, villages: Village[]): string {
   return `rgb(${base[0]},${base[1]},${base[2]})`;
 }
 
-const HOUSE_RENDER_SIZE = 2; // tiles per house side
-
-function isInsideAnyHouse(entity: Entity, world: WorldState): boolean {
-  for (const h of world.houses) {
-    if (entity.position.x >= h.position.x && entity.position.x < h.position.x + HOUSE_RENDER_SIZE
-      && entity.position.y >= h.position.y && entity.position.y < h.position.y + HOUSE_RENDER_SIZE) {
-      return true;
-    }
-  }
-  return false;
-}
 
 function drawPersonSprite(
   ctx: CanvasRenderingContext2D,
@@ -84,8 +78,12 @@ function drawPersonSprite(
   moving: boolean,
   facingLeft: boolean,
 ) {
-  const sy = PERSON_SY[`${gender}-${Math.max(0, Math.min(2, tribe))}`] ?? 32;
-  const sxArr = moving ? PERSON_WALK_SX : PERSON_IDLE_SX;
+  const sy = isChild
+    ? CHILD_SY
+    : PERSON_SY[`${gender}-${Math.max(0, Math.min(2, tribe))}`] ?? 32;
+  const sxArr = isChild
+    ? (moving ? CHILD_RUN_SX : CHILD_IDLE_SX)
+    : (moving ? PERSON_WALK_SX : PERSON_IDLE_SX);
   const sx = sxArr[frameIdx % sxArr.length];
 
   const renderScale = isChild ? 0.68 : 0.82;
@@ -241,14 +239,13 @@ function drawAnimalSprite(
   ctx.restore();
 }
 
-type ActionBadge = 'fight' | 'train' | 'hunt' | 'gather' | 'chop' | 'build';
+type ActionBadge = 'fight' | 'hunt' | 'gather' | 'chop' | 'build';
 
 // Action badge sprites: { sheet, sx, sy }
 const ACTION_SPRITES: Record<ActionBadge, { sheet: keyof SpriteAssets; sx: number; sy: number }> = {
   build:  { sheet: 'walls', sx: 72, sy: 24 },
   chop:   { sheet: 'items', sx: 16, sy: 56 },
   fight:  { sheet: 'items', sx: 0,  sy: 16 },
-  train:  { sheet: 'misc',  sx: 0,  sy: 384 },
   hunt:   { sheet: 'items', sx: 0,  sy: 24 },
   gather: { sheet: 'items', sx: 0,  sy: 160 },
 };
@@ -522,7 +519,8 @@ export function GridCanvas({ world, size, selectedId, selectedTile, onClick, sho
     // --- Group entities by tile ---
     const tileMap = new Map<number, Entity[]>();
     for (const entity of world.entities) {
-      if (isInsideAnyHouse(entity, world)) continue;
+      // Infants (< 1yr) are carried by mother — don't render separately.
+      if (ageInYears(entity) < ECONOMY.reproduction.infantAgeYears) continue;
       const key = entity.position.y * world.gridSize + entity.position.x;
       const group = tileMap.get(key);
       if (group) {
@@ -554,7 +552,6 @@ export function GridCanvas({ world, size, selectedId, selectedTile, onClick, sho
     for (const [, group] of tileMap) {
       const count = group.length;
       const hasFighting = group.some(e => workingAction(e) === 'fighting');
-      const hasTraining = group.some(e => workingAction(e) === 'training');
       const hasHunting = group.some(e => workingAction(e) === 'hunting');
       const hasGathering = group.some(e => workingAction(e) === 'gathering');
 
@@ -600,8 +597,6 @@ export function GridCanvas({ world, size, selectedId, selectedTile, onClick, sho
       const baseCy = group[0].position.y * cellSize + cellSize / 2;
       if (hasFighting) {
         tileIcons.push({ cx: baseCx, cy: baseCy, kind: 'fight' });
-      } else if (hasTraining) {
-        tileIcons.push({ cx: baseCx, cy: baseCy, kind: 'train' });
       } else if (hasHunting) {
         tileIcons.push({ cx: baseCx, cy: baseCy, kind: 'hunt' });
       } else if (hasGathering) {
@@ -654,7 +649,6 @@ export function GridCanvas({ world, size, selectedId, selectedTile, onClick, sho
     };
     ctx.globalAlpha = 0.5;
     for (const entity of world.entities) {
-      if (isInsideAnyHouse(entity, world)) continue;
       if (ageInYears(entity) < CHILD_AGE) continue;
       if (entity.activity.kind !== 'moving') continue;
       const target = entity.activity.target;

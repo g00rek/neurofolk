@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react';
 const MINI_MEDIEVAL_BASE = '/assets/mini-medieval/Mini-Medieval-8x8';
 const UNITS = `${MINI_MEDIEVAL_BASE}/Units.png`;
 const STRUCTURES = `${MINI_MEDIEVAL_BASE}/Structures.png`;
-const MISC = `${MINI_MEDIEVAL_BASE}/Misc.png`;
 const OVERWORLD = `${MINI_MEDIEVAL_BASE}/Overworld.png`;
 const ANIMALS = `${MINI_MEDIEVAL_BASE}/Animals.png`;
 
@@ -291,7 +290,6 @@ export function SlashIconsPage() {
         <Row name="build" id="Walls.png|72,24,8,8" preview={<MapSpritePreview src={`${MINI_MEDIEVAL_BASE}/Walls.png`} sx={72} sy={24} sw={8} sh={8} wFrac={0.8} hFrac={0.8} />} />
         <Row name="chop" id="Items.png|16,56,8,8" preview={<MapSpritePreview src={`${MINI_MEDIEVAL_BASE}/Items.png`} sx={16} sy={56} sw={8} sh={8} wFrac={0.8} hFrac={0.8} />} />
         <Row name="fight" id="Items.png|0,16,8,8" preview={<MapSpritePreview src={`${MINI_MEDIEVAL_BASE}/Items.png`} sx={0} sy={16} sw={8} sh={8} wFrac={0.8} hFrac={0.8} />} />
-        <Row name="train" id="Misc.png|0,384,8,8" preview={<MapSpritePreview src={MISC} sx={0} sy={384} sw={8} sh={8} wFrac={0.8} hFrac={0.8} />} />
         <Row name="hunt" id="Items.png|0,24,8,8" preview={<MapSpritePreview src={`${MINI_MEDIEVAL_BASE}/Items.png`} sx={0} sy={24} sw={8} sh={8} wFrac={0.8} hFrac={0.8} />} />
         <Row name="gather" id="Items.png|0,160,8,8" preview={<MapSpritePreview src={`${MINI_MEDIEVAL_BASE}/Items.png`} sx={0} sy={160} sw={8} sh={8} wFrac={0.8} hFrac={0.8} />} />
       </section>

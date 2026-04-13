@@ -4,15 +4,15 @@ export type Gender = 'male' | 'female';
 // Replaces the old (state, stateTimer, goal) trio. Three kinds:
 //   idle    — nothing, waiting for AI to pick next activity
 //   moving  — walking or running toward a target with a stated purpose
-//   working — performing a timed action in place (hunt/gather/chop/cook/build/fight/train)
+//   working — performing a timed action in place (hunt/gather/chop/cook/build/fight)
 // Pregnancy is NOT here — it's a parallel condition (entity.pregnancyTimer).
 export type Pace = 'walk' | 'run';
 
 // What the entity intends to do when they arrive at the target tile.
-export type Purpose = 'hunt' | 'gather' | 'chop' | 'build' | 'cook' | 'spar' | 'deposit';
+export type Purpose = 'hunt' | 'gather' | 'chop' | 'build' | 'cook' | 'deposit';
 
 // The in-place action the entity is executing right now. Each has a baseline duration.
-export type Action = 'hunting' | 'gathering' | 'chopping' | 'building' | 'cooking' | 'training' | 'fighting';
+export type Action = 'hunting' | 'gathering' | 'chopping' | 'building' | 'cooking' | 'fighting';
 
 export type Activity =
   | { kind: 'idle' }
@@ -26,7 +26,6 @@ export const ACTION_DURATION: Record<Action, number> = {
   chopping: 3,
   cooking: 8,
   building: 10,
-  training: 3,
   fighting: 5,
 };
 
@@ -41,14 +40,11 @@ export interface Position {
 
 export type RGB = [number, number, number];
 
+// All traits on a uniform 0-100 scale. Typical spawn range 30-70.
 export interface Traits {
-  strength: number;      // 1-10: fight chance, hunting speed
-  speed: number;         // 1-3: steps per tick
-  perception: number;    // 1-5: food/mate sensing range
-  metabolism: number;    // 0.5-2.0: lower = less energy drain but slower
-  aggression: number;    // 0-10: 0 = always flee, 10 = always fight
-  fertility: number;     // 0.5-2.0: higher = shorter mating time but shorter maxAge
-  twinChance: number;   // 0-1: chance of multiple births (0=always single, 1=always multiples)
+  strength: number;      // 0-100: fight weight, mating chance, physical work efficiency
+  dexterity: number;     // 0-100: steps/tick (0-33→1, 34-66→2, 67-100→3); future: hit/dodge
+  intelligence: number;  // 0-100: reserved for future mechanics
 }
 
 export type TribeId = number; // 0/1/2 = starting tribes
@@ -129,10 +125,6 @@ export const ECONOMY = {
     infantAgeYears: 1,             // age < this = infant (breastfed, no drain, no eat)
     childDrainMultiplier: 0.25,    // age infantAge..CHILD_AGE: partial metabolism (25% — small bodies)
   },
-  // --- SPARRING (training cooldown) ---
-  sparring: {
-    cooldownTicks: 200,            // ~10 days rest after a sparring session before the next
-  },
 } as const;
 
 // Aliases (backward-compat) — derive from ECONOMY for clarity in existing call sites.
@@ -150,13 +142,11 @@ export interface Entity {
   color: RGB;
   energy: number;
   traits: Traits;
-  hungerThreshold?: number;
   tribe: TribeId;
   homeId?: string;
   motherId?: string;      // children follow her
   birthCooldown: number;  // ticks until next pregnancy allowed
   pregnancyTimer: number; // > 0 = pregnant
-  sparCooldown: number;   // > 0 = resting after sparring
   fatherTraits?: Traits;
   fatherTribe?: TribeId;
   carrying?: { type: 'meat' | 'wood' | 'fruit'; amount: number };
@@ -165,8 +155,6 @@ export interface Entity {
 export const MEAT_PORTIONS_PER_HUNT = ECONOMY.meat.unitsPerHunt;
 
 // Traits
-export const TRAIT_ENERGY_COST = 0.15; // extra energy drain per total trait points above baseline
-
 export interface Animal {
   id: string;
   position: Position;
@@ -291,7 +279,7 @@ export type DeathCause = 'old_age' | 'starvation' | 'fight' | 'childbirth';
 export type LogEventType =
   | 'birth' | 'death' | 'pregnant'
   | 'hunt' | 'gather' | 'chop' | 'build_start' | 'build_done'
-  | 'fight' | 'train' | 'house_claimed';
+  | 'fight' | 'house_claimed';
 
 export interface LogEntry {
   tick: number;
