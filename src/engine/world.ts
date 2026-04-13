@@ -1117,7 +1117,7 @@ export function tick(state: WorldState): WorldState {
     // Periodic re-evaluation of current travel goal (hysteresis — every RE_EVAL_INTERVAL).
     if (entity.activity.kind === 'moving' && tickNum > 0
         && (tickNum - entity.activity.setTick) % 20 === 0) {
-      const ctx = buildAIContext(entity, updatedVillages, animals, trees, entities, biomes, gridSize, tickNum, houses, pre);
+      const ctx = buildAIContext(entity, updatedVillages, animals, trees, entities, biomes, gridSize, tickNum, houses, state.goldDeposits, pre);
       const result = shouldReEvaluate(ctx, entity.activity.purpose, entity.activity.setTick, tickNum);
       if (result.interrupt) {
         entity = { ...entity, activity: result.newActivity ?? IDLE };
@@ -1127,7 +1127,7 @@ export function tick(state: WorldState): WorldState {
 
     // No activity → ask AI for a new one.
     if (entity.activity.kind === 'idle') {
-      const ctx = buildAIContext(entity, updatedVillages, animals, trees, entities, biomes, gridSize, tickNum, houses, pre);
+      const ctx = buildAIContext(entity, updatedVillages, animals, trees, entities, biomes, gridSize, tickNum, houses, state.goldDeposits, pre);
       const action = decideAction(ctx);
       const newActivity = actionToActivity(action, ctx, tickNum);
       if (newActivity) {

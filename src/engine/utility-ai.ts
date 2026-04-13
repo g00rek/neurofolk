@@ -1,4 +1,4 @@
-import type { Entity, Activity, Pace, Purpose, Position, Animal, Tree, House, Village, Biome, Gender, TribeId } from './types';
+import type { Entity, Activity, Pace, Purpose, Position, Animal, Tree, House, Village, Biome, Gender, TribeId, GoldDeposit } from './types';
 import {
   CHILD_AGE,
   ANIMAL_HUNT_MIN_POPULATION, scaled,
@@ -141,10 +141,10 @@ export interface RoleConfig {
 
 export const ROLES: Record<Gender, RoleConfig> = {
   female: {
-    actions: { gather: 1.0, cook: 1.0, deposit: 1.0, rest: 1.0, play: 1.0 }
+    actions: { gather: 1.0, cook: 1.0, deposit: 1.0, mine: 0.8, rest: 1.0, play: 1.0 }
   },
   male: {
-    actions: { hunt: 1.0, chop: 0.9, build: 1.0, deposit: 1.0, rest: 1.0, play: 1.0 }
+    actions: { hunt: 1.0, chop: 0.9, build: 1.0, mine: 1.0, deposit: 1.0, rest: 1.0, play: 1.0 }
   },
 };
 
@@ -154,6 +154,7 @@ export type AIAction =
   | { type: 'go_chop'; target: Position }
   | { type: 'go_hunt'; target: Position }
   | { type: 'go_build'; target: Position }
+  | { type: 'go_mine'; target: Position }
   | { type: 'deposit' }   // go to village stockpile — deposit carrying OR eat from pantry
   | { type: 'go_gather'; target: Position }
   | { type: 'go_cook'; target: Position }
@@ -171,6 +172,7 @@ export interface AIContext {
   nearestFruitTree?: { pos: Position; dist: number };       // home-filtered, for routine gather
   nearestEdibleFruit?: { pos: Position; dist: number };     // any visible fruit, for survival
   nearestForest?: { pos: Position; dist: number };
+  nearestGoldDeposit?: { pos: Position; dist: number };
   villageNeedsHouses: boolean;
   nearestBuildSite?: { pos: Position; dist: number };
   totalMeat: number;        // raw meat in village stockpile
@@ -296,6 +298,20 @@ function scoreChopWood(ctx: AIContext): number {
   return woodNeed * 0.95;
 }
 
+// Gold mining is a "free time" activity — runs when the tribe is fed and has shelter
+// in progress. Never beats survival/build/food-work. Produces pure wealth (for future
+// mercenary hire + inter-tribe rivalry pressure).
+function scoreMineGold(ctx: AIContext): number {
+  if (ageInYears(ctx.entity) < CHILD_AGE) return 0;
+  if (!ctx.village) return 0;
+  if (ctx.entity.carrying && ctx.entity.carrying.amount > 0) return 0;
+  if (!ctx.nearestGoldDeposit) return 0;
+  // Only when food is at least comfortable — don't starve the tribe to chase wealth.
+  if (ctx.daysOfFood < FOOD_COMFORT_DAYS) return 0;
+  if (ctx.daysOfFood < FOOD_SURPLUS_DAYS) return 0.3;
+  return 0.5;
+}
+
 // Hunt urgency driven by tribe's days-of-food buffer, throttled by animal-to-human ratio
 // so hunting doesn't wipe out the herd when food is comfortable but animals are few.
 function scoreHunt(ctx: AIContext): number {
@@ -364,6 +380,7 @@ export function getScores(ctx: AIContext): Record<string, number> {
     gather: scoreGather(ctx),
     deposit: scoreDeposit(ctx),
     cook: scoreCook(ctx),
+    mine: scoreMineGold(ctx),
   };
   // Mapping from score-key to role.actions key (some differ in spelling).
   const roleKey: Record<string, string> = {
@@ -444,6 +461,15 @@ export function decideAction(ctx: AIContext): AIAction {
     scores.push({ key: 'cook', score: cookScore, action: () => ({ type: 'go_cook', target: ctx.village!.stockpile! }) });
   }
 
+  // Mine gold — free-time activity when tribe is well-fed
+  const mineScore = scoreMineGold(ctx);
+  if (mineScore > 0 && ctx.nearestGoldDeposit) {
+    scores.push({
+      key: 'mine', score: mineScore,
+      action: () => ({ type: 'go_mine', target: ctx.nearestGoldDeposit!.pos }),
+    });
+  }
+
   // Deposit carrying at stockpile — highest priority when carrying anything
   const depositScore = scoreDeposit(ctx);
   if (depositScore > 0) {
@@ -484,6 +510,7 @@ export function buildAIContext(
   gridSize: number,
   _tick: number = 0,
   houses: House[] = [],
+  goldDeposits: GoldDeposit[] = [],
   pre?: PrecomputedContext,
 ): AIContext {
   const village = villages.find(v => v.tribe === entity.tribe);
@@ -581,6 +608,16 @@ export function buildAIContext(
     }
   }
 
+  // Find nearest gold deposit with remaining ore
+  let nearestGoldDeposit: AIContext['nearestGoldDeposit'];
+  for (const d of goldDeposits) {
+    if (d.remaining <= 0) continue;
+    const dist = Math.abs(d.position.x - entity.position.x) + Math.abs(d.position.y - entity.position.y);
+    if (dist > 0 && (!nearestGoldDeposit || dist < nearestGoldDeposit.dist)) {
+      nearestGoldDeposit = { pos: d.position, dist };
+    }
+  }
+
   // Village needs houses: homeless + upcoming births > existing slots + in-progress builds.
   // Use precomputed per-tribe counts when available.
   const homelessCount = pre?.homelessByTribe.get(entity.tribe)
@@ -672,6 +709,7 @@ export function buildAIContext(
     nearestFruitTree,
     nearestEdibleFruit,
     nearestForest,
+    nearestGoldDeposit,
     villageNeedsHouses,
     nearestBuildSite,
     totalMeat: village?.meatStore ?? 0,
@@ -697,6 +735,7 @@ export function scoreForGoalType(ctx: AIContext, goalType: string): number {
     case 'build': return scoreBuildHome(ctx);
     case 'deposit': return scoreDeposit(ctx);
     case 'cook': return scoreCook(ctx);
+    case 'mine': return scoreMineGold(ctx);
     default: return 0;
   }
 }
@@ -708,6 +747,7 @@ function actionToKey(action: AIAction): string {
     case 'go_chop': return 'chop';
     case 'go_build': return 'build';
     case 'go_cook': return 'cook';
+    case 'go_mine': return 'mine';
     case 'deposit': return 'deposit';
     case 'play': return 'play';
     case 'rest': return 'rest';
@@ -766,6 +806,7 @@ export function actionToActivity(action: AIAction, ctx: AIContext, tickNum: numb
     case 'go_chop':  return mk('chop', action.target);
     case 'go_build': return mk('build', action.target);
     case 'go_cook':  return mk('cook', action.target);
+    case 'go_mine':  return mk('mine', action.target);
     case 'deposit': {
       const target = ctx.village?.stockpile;
       if (!target) return undefined;

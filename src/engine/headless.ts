@@ -29,7 +29,7 @@ for (let t = 0; t < TICKS; t++) {
 
     // Show what each entity is doing
     for (const e of world.entities) {
-      const ctx = buildAIContext(e, world.villages, world.animals, world.trees, world.entities, world.biomes, world.gridSize, 0, world.houses);
+      const ctx = buildAIContext(e, world.villages, world.animals, world.trees, world.entities, world.biomes, world.gridSize, 0, world.houses, world.goldDeposits);
       const scores = getScores(ctx);
       const action = decideAction(ctx);
       const topScore = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];

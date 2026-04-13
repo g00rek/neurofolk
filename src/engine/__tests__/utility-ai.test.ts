@@ -250,6 +250,45 @@ describe('hysteresis re-evaluation', () => {
     expect(typeof scoreForGoalType(ctx, 'chop')).toBe('number');
     expect(typeof scoreForGoalType(ctx, 'build')).toBe('number');
     expect(typeof scoreForGoalType(ctx, 'deposit')).toBe('number');
+    expect(typeof scoreForGoalType(ctx, 'mine')).toBe('number');
     expect(scoreForGoalType(ctx, 'unknown')).toBe(0);
+  });
+});
+
+describe('scoreMineGold', () => {
+  it('is 0 when entity is a child', () => {
+    const ctx = makeContext({
+      entity: makeEntity({ gender: 'male', age: 0 }),
+      nearestGoldDeposit: { pos: { x: 7, y: 5 }, dist: 2 },
+      daysOfFood: 999,
+    });
+    expect(getScores(ctx).mine ?? 0).toBe(0);
+  });
+
+  it('is 0 when daysOfFood is below comfort (30)', () => {
+    const ctx = makeContext({
+      entity: makeEntity({ gender: 'male' }),
+      nearestGoldDeposit: { pos: { x: 7, y: 5 }, dist: 2 },
+      daysOfFood: 10,
+    });
+    expect(getScores(ctx).mine ?? 0).toBe(0);
+  });
+
+  it('is > 0 when food is comfortable and a deposit is in sight', () => {
+    const ctx = makeContext({
+      entity: makeEntity({ gender: 'male' }),
+      nearestGoldDeposit: { pos: { x: 7, y: 5 }, dist: 2 },
+      daysOfFood: 100,
+    });
+    expect((getScores(ctx).mine ?? 0)).toBeGreaterThan(0);
+  });
+
+  it('is 0 when no deposit is in sight', () => {
+    const ctx = makeContext({
+      entity: makeEntity({ gender: 'male' }),
+      daysOfFood: 100,
+      // no nearestGoldDeposit
+    });
+    expect(getScores(ctx).mine ?? 0).toBe(0);
   });
 });

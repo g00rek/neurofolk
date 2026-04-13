@@ -122,7 +122,7 @@ for (let i = 0; i < MAX_TICKS; i++) {
 
   if (changes.length > 0) {
     // On significant change: also show AI scores + top decision
-    const ctx = buildAIContext(curr, world.villages, world.animals, world.trees, world.entities, world.biomes, world.gridSize, world.tick, world.houses);
+    const ctx = buildAIContext(curr, world.villages, world.animals, world.trees, world.entities, world.biomes, world.gridSize, world.tick, world.houses, world.goldDeposits);
     const scores = getScores(ctx);
     const decision = decideAction(ctx).type;
     const sig = scoresBrief(scores);
@@ -136,7 +136,7 @@ for (let i = 0; i < MAX_TICKS; i++) {
 
   // Periodic heartbeat every 500 ticks (~25 days) if no changes for a while
   if (world.tick - lastLoggedTick > 500) {
-    const ctx = buildAIContext(curr, world.villages, world.animals, world.trees, world.entities, world.biomes, world.gridSize, world.tick, world.houses);
+    const ctx = buildAIContext(curr, world.villages, world.animals, world.trees, world.entities, world.biomes, world.gridSize, world.tick, world.houses, world.goldDeposits);
     logLine('[heartbeat]', curr, `decision:${decideAction(ctx).type}`);
   }
 
@@ -147,7 +147,7 @@ for (let i = 0; i < MAX_TICKS; i++) {
       const males = world.entities.filter(e => e.tribe === curr.tribe && e.gender === 'male' && ageInYears(e) >= CHILD_AGE);
       const malesByAction = new Map<string, number>();
       for (const m of males) {
-        const ctx = buildAIContext(m, world.villages, world.animals, world.trees, world.entities, world.biomes, world.gridSize, world.tick, world.houses);
+        const ctx = buildAIContext(m, world.villages, world.animals, world.trees, world.entities, world.biomes, world.gridSize, world.tick, world.houses, world.goldDeposits);
         const a = decideAction(ctx).type;
         malesByAction.set(a, (malesByAction.get(a) ?? 0) + 1);
       }
