@@ -899,7 +899,7 @@ export function tick(state: WorldState): WorldState {
   // grass: deep copy — mutated each tick (animals graze, regrowth).
   const biomes = state.biomes;
   let trees = [...state.trees];
-  const goldDeposits = state.goldDeposits;
+  let goldDeposits = [...state.goldDeposits];
   const grass = state.grass.map(row => [...row]);
   // blockedTiles = static structures that block movement (houses + stockpiles).
   // Entities path AROUND these and stand adjacent (deposit / cook arrival check).
