@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createWorld, tick } from '../world';
-import type { WorldState, Entity } from '../types';
+import type { WorldState } from '../types';
 import { ECONOMY, TICKS_PER_YEAR } from '../types';
 import { isPassable } from '../biomes';
 

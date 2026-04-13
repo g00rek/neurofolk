@@ -7,7 +7,7 @@ import {
   ANIMAL_COUNT, scaled,
   FIGHT_MIN_AGE, MEAT_PORTIONS_PER_HUNT, TREE_FRUIT_PORTIONS,
   ANIMAL_REPRO_INTERVAL, FOREST_SPEED_PENALTY,
-  WOOD_PER_CHOP, NEAR_HOME_RANGE, VILLAGE_EAT_RANGE, MAX_ENTITIES_PER_TILE,
+  WOOD_PER_CHOP, VILLAGE_EAT_RANGE, MAX_ENTITIES_PER_TILE,
   HUNT_KILL_RANGE, HOUSE_WOOD_COST, HOUSE_CAPACITY, HOUSE_SIZE,
   ANIMAL_ENERGY_MAX, ANIMAL_ENERGY_START, ANIMAL_ENERGY_DRAIN,
   ANIMAL_DRAIN_INTERVAL, ANIMAL_REPRO_MIN_ENERGY, GRASS_MAX_PER_TILE,
@@ -458,14 +458,6 @@ function randomPos(gridSize: number): Position {
   };
 }
 
-function houseCenterPos(h: House): Position {
-  const off = Math.floor(HOUSE_SIZE / 2);
-  return { x: h.position.x + off, y: h.position.y + off };
-}
-
-function isNearTribeHouses(pos: Position, tribe: TribeId, houses: House[]): boolean {
-  return houses.some(h => h.tribe === tribe && manhattan(pos, houseCenterPos(h)) <= NEAR_HOME_RANGE + 1);
-}
 
 
 /** Check if a house can be placed at (x,y) as top-left corner */

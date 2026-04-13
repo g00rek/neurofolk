@@ -4,7 +4,6 @@ import { ageInYears } from '../engine/world';
 import {
   Axe,
   Baby,
-  Coins,
   CookingPot,
   GenderFemale,
   GenderMale,
