@@ -1,4 +1,4 @@
-import type { Biome, Tree } from '../../engine/types';
+import type { Biome, GoldDeposit, Tree } from '../../engine/types';
 import { drawWaterAutotileLayer } from './waterAutotile';
 
 export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
@@ -140,6 +140,29 @@ export function drawTreeLayer(
     const py = tree.position.y * cellSize;
     ctx.drawImage(overworld, src.sx, src.sy, src.sw, src.sh,
       px, py, drawSize, drawSize);
+  }
+}
+
+// ── Layer 3: Gold deposits (placeholder nuggets) ───────────────────
+
+export function drawGoldLayer(
+  ctx: CanvasRenderingContext2D,
+  deposits: GoldDeposit[],
+  cellSize: number,
+) {
+  for (const d of deposits) {
+    if (d.remaining <= 0) continue;  // depleted — hide
+    const cx = d.position.x * cellSize + cellSize / 2;
+    const cy = d.position.y * cellSize + cellSize / 2;
+    const r = Math.max(2, cellSize * 0.28);
+    // Flat-shaded gold nugget (placeholder — swap for sprite later).
+    ctx.fillStyle = '#e6b422';            // gold yellow
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#7a5b00';
+    ctx.lineWidth = Math.max(1, cellSize * 0.04);
+    ctx.stroke();
   }
 }
 

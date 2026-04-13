@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import type { WorldState, Entity, Village } from '../engine/types';
 import { CHILD_AGE, TICKS_PER_DAY, TICKS_PER_YEAR, RUNTIME_CONFIG, ECONOMY } from '../engine/types';
 import { ageInYears } from '../engine/world';
-import { drawSurfaceLayer, drawWaterLayer, drawTreeLayer, drawGrassLayer } from './terrain/renderer';
+import { drawSurfaceLayer, drawWaterLayer, drawTreeLayer, drawGrassLayer, drawGoldLayer } from './terrain/renderer';
 import type { Season } from './terrain/renderer';
 
 const MINI_MEDIEVAL_BASE = '/assets/mini-medieval/Mini-Medieval-8x8';
@@ -438,6 +438,9 @@ export function GridCanvas({ world, size, selectedId, selectedTile, onClick, sho
     if (sprites) {
       drawTreeLayer(ctx, sprites.overworld, world.trees, cellSize, season, world.biomes);
     }
+
+    // --- Layer 2a: Gold deposits ---
+    drawGoldLayer(ctx, world.goldDeposits, cellSize);
 
     // --- Layer 2b: Structures (stockpiles, houses) ---
     for (const village of world.villages) {
