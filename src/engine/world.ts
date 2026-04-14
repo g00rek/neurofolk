@@ -190,8 +190,21 @@ function stepToward(
       queue.push({ pos: candidate, firstStep: firstStep ?? candidate });
     }
   }
-  // No path within budget — entity stays put. Caller handles via "can't move" branch.
-  return from;
+  // BFS exhausted budget — fall back to greedy step (nearest passable neighbor toward target).
+  // This keeps entities moving toward distant targets (e.g., gold deposits on large maps)
+  // even when BFS can't plan the full path in one tick.
+  const fallbackDirs: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  let bestStep = from;
+  let bestDist = Math.abs(from.x - to.x) + Math.abs(from.y - to.y);
+  for (const [dx, dy] of fallbackDirs) {
+    const nx = from.x + dx, ny = from.y + dy;
+    const candidate = { x: nx, y: ny };
+    if (!isValidMove(candidate, biomes, gridSize, blockedTiles)) continue;
+    if (moveGrid && moveGrid[ny][nx] >= MAX_ENTITIES_PER_TILE) continue;
+    const d = Math.abs(nx - to.x) + Math.abs(ny - to.y);
+    if (d < bestDist) { bestDist = d; bestStep = candidate; }
+  }
+  return bestStep;
 }
 
 function randomPos(gridSize: number): Position {
