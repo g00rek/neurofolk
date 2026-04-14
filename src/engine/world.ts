@@ -85,15 +85,6 @@ export function getMoveTarget(e: Entity): Position | undefined {
 
 // IDLE and startWork moved to action-resolver.ts
 
-function homePosition(e: Entity, houses: House[]): Position | undefined {
-  if (!e.homeId) return undefined;
-  const h = houses.find(h => h.id === e.homeId);
-  if (!h) return undefined;
-  // Return center of house
-  const off = Math.floor(HOUSE_SIZE / 2);
-  return { x: h.position.x + off, y: h.position.y + off };
-}
-
 // Entity is "in village" if inside the tribal eat zone:
 // chebyshev ≤ VILLAGE_EAT_RANGE from stockpile OR from any tribe house center.
 // This is the zone where entity can eat from village stockpile without physically being at it.
@@ -115,10 +106,6 @@ function isAtHome(e: Entity, houses: House[]): boolean {
   const dx = e.position.x - house.position.x;
   const dy = e.position.y - house.position.y;
   return dx >= 0 && dx < HOUSE_SIZE && dy >= 0 && dy < HOUSE_SIZE;
-}
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v));
 }
 
 // Action resolvers (arrival + completion) moved to action-resolver.ts

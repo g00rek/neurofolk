@@ -14,6 +14,7 @@ const ANIMALS_SHEET_URL = `${MINI_MEDIEVAL_BASE}/Animals.png`;
 const INTERFACE_SHEET_URL = `${MINI_MEDIEVAL_BASE}/Interface.png`;
 const WALLS_SHEET_URL = `${MINI_MEDIEVAL_BASE}/Walls.png`;
 const ITEMS_SHEET_URL = `${MINI_MEDIEVAL_BASE}/Items.png`;
+const ORES_SHEET_URL = `${MINI_MEDIEVAL_BASE}/Ores.png`;
 
 interface GridCanvasProps {
   world: WorldState;
@@ -34,6 +35,7 @@ interface SpriteAssets {
   walls: HTMLImageElement;
   items: HTMLImageElement;
   animals: HTMLImageElement;
+  ores: HTMLImageElement;
 }
 
 
@@ -294,7 +296,7 @@ export function GridCanvas({ world, size, selectedId, selectedTile, onClick, sho
     const imgs = {
       units: new Image(), structures: new Image(), misc: new Image(),
       overworld: new Image(), animals: new Image(), ui: new Image(),
-      walls: new Image(), items: new Image(),
+      walls: new Image(), items: new Image(), ores: new Image(),
     };
     const total = Object.keys(imgs).length;
     let loaded = 0;
@@ -313,6 +315,7 @@ export function GridCanvas({ world, size, selectedId, selectedTile, onClick, sho
     imgs.ui.src = INTERFACE_SHEET_URL;
     imgs.walls.src = WALLS_SHEET_URL;
     imgs.items.src = ITEMS_SHEET_URL;
+    imgs.ores.src = ORES_SHEET_URL;
     return () => { cancelled = true; };
   }, []);
 
@@ -440,7 +443,7 @@ export function GridCanvas({ world, size, selectedId, selectedTile, onClick, sho
     }
 
     // --- Layer 2a: Gold deposits ---
-    drawGoldLayer(ctx, world.goldDeposits, cellSize);
+    drawGoldLayer(ctx, sprites.ores, world.goldDeposits, cellSize);
 
     // --- Layer 2b: Structures (stockpiles, houses) ---
     for (const village of world.villages) {

@@ -20,10 +20,6 @@ import { randomName } from './names';
 
 // ── Helpers (mirrored from world.ts — kept local to avoid circular deps) ──
 
-function ageInYears(e: Entity): number {
-  return Math.floor(e.age / TICKS_PER_YEAR);
-}
-
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
 }

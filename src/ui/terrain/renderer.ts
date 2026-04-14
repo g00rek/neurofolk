@@ -143,26 +143,26 @@ export function drawTreeLayer(
   }
 }
 
-// ── Layer 3: Gold deposits (placeholder nuggets) ───────────────────
+// ── Layer 3: Gold deposits ──────────────────────────────────────────
+// Sprite: Ores.png at (0, 24, 8×8)
+const GOLD_SPRITE = { sx: 0, sy: 24, sw: 8, sh: 8 };
 
 export function drawGoldLayer(
   ctx: CanvasRenderingContext2D,
+  ores: HTMLImageElement,
   deposits: GoldDeposit[],
   cellSize: number,
 ) {
+  ctx.imageSmoothingEnabled = false;
   for (const d of deposits) {
-    if (d.remaining <= 0) continue;  // depleted — hide
-    const cx = d.position.x * cellSize + cellSize / 2;
-    const cy = d.position.y * cellSize + cellSize / 2;
-    const r = Math.max(2, cellSize * 0.28);
-    // Flat-shaded gold nugget (placeholder — swap for sprite later).
-    ctx.fillStyle = '#e6b422';            // gold yellow
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#7a5b00';
-    ctx.lineWidth = Math.max(1, cellSize * 0.04);
-    ctx.stroke();
+    if (d.remaining <= 0) continue;
+    const px = d.position.x * cellSize;
+    const py = d.position.y * cellSize;
+    ctx.drawImage(
+      ores,
+      GOLD_SPRITE.sx, GOLD_SPRITE.sy, GOLD_SPRITE.sw, GOLD_SPRITE.sh,
+      px, py, cellSize, cellSize,
+    );
   }
 }
 
@@ -251,7 +251,9 @@ export function drawTerrain(opts: TerrainRenderOpts) {
   if (opts.ores) {
     drawMountainLayer(opts.ctx, opts.ores, opts.biomes, opts.gridSize, opts.cellSize);
   }
-  drawGoldLayer(opts.ctx, opts.goldDeposits ?? [], opts.cellSize);
+  if (opts.ores) {
+    drawGoldLayer(opts.ctx, opts.ores, opts.goldDeposits ?? [], opts.cellSize);
+  }
   if (opts.grid) {
     drawGridOverlay(opts.ctx, opts.gridSize, opts.cellSize, undefined);
   }
