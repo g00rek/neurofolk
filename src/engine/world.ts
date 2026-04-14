@@ -1033,8 +1033,13 @@ export function tick(state: WorldState): WorldState {
         : entity.position.x === target.x && entity.position.y === target.y;
 
       if (!atTarget) {
-        const moveTarget = stepToward(entity.position, target, biomes, gridSize, blockedTiles, moveGrid);
-        if (!moveTarget || (moveTarget.x === entity.position.x && moveTarget.y === entity.position.y)) {
+        let moveTarget = stepToward(entity.position, target, biomes, gridSize, blockedTiles, moveGrid);
+        if (moveTarget.x === entity.position.x && moveTarget.y === entity.position.y) {
+          // BFS failed with occupancy filter — retry without it (path through crowds).
+          // Step execution below still prevents overlap; entity just waits this tick.
+          moveTarget = stepToward(entity.position, target, biomes, gridSize, blockedTiles);
+        }
+        if (moveTarget.x === entity.position.x && moveTarget.y === entity.position.y) {
           entity = { ...entity, activity: IDLE };
           entities[idx] = entity;
           break;
