@@ -18,6 +18,7 @@ import type { BiomeGenParams } from './biomes';
 import { decideAction, buildAIContext, actionToActivity, shouldReEvaluate, precomputeContext } from './utility-ai';
 import { randomName } from './names';
 import { applyEnergyDrain, eatFromCarrying, eatFromStockpile } from './metabolism';
+import { processDeaths, processBirths } from './demography';
 
 interface CreateWorldOptions {
   gridSize: number;
@@ -344,26 +345,7 @@ function randomTraits(): Traits {
   };
 }
 
-function inheritTrait(a: number, b: number, mutation: number): number {
-  const avg = (a + b) / 2;
-  return clamp(Math.round(avg + (Math.random() * mutation * 2 - mutation)), 0, 100);
-}
-
-function inheritTraits(a: Traits, b: Traits): Traits {
-  const dramaticMutation = Math.random() < 0.03;
-  const MUTATION = 6; // ±6 points on 0-100 scale per trait
-  const traits: Traits = {
-    strength: inheritTrait(a.strength, b.strength, MUTATION),
-    dexterity: inheritTrait(a.dexterity, b.dexterity, MUTATION),
-    intelligence: inheritTrait(a.intelligence, b.intelligence, MUTATION),
-  };
-  if (dramaticMutation) {
-    const keys: (keyof Traits)[] = ['strength', 'dexterity', 'intelligence'];
-    const key = keys[Math.floor(Math.random() * keys.length)];
-    traits[key] = Math.random() < 0.5 ? 0 : 100;
-  }
-  return traits;
-}
+// inheritTrait / inheritTraits moved to demography.ts
 
 // Steps per tick from dexterity (0-33 → 1, 34-66 → 2, 67-100 → 3).
 function dexToSteps(dex: number): number {
@@ -848,31 +830,7 @@ function pheromoneMating(entities: Entity[], villages: Village[], _houses: House
   return updated;
 }
 
-// Builds a "why did this starvation happen" diagnostic string for the death log.
-// Reports village stockpile + projected days of food the tribe had at moment of death.
-// Useful for telling "starved because no food" apart from "starved WITH food available".
-function starvationContext(dead: Entity, allEntities: Entity[], villages: Village[]): string {
-  const v = villages.find(vv => vv.tribe === dead.tribe);
-  if (!v) return 'no village';
-  const raw = v.meatStore + v.plantStore;
-  const cooked = v.cookedMeatStore + v.driedFruitStore;
-  let adults = 0, toddlers = 0;
-  for (const e of allEntities) {
-    if (e.tribe !== v.tribe) continue;
-    const years = Math.floor(e.age / TICKS_PER_YEAR);
-    if (years >= CHILD_AGE) adults++;
-    else if (years >= ECONOMY.reproduction.infantAgeYears) toddlers++;
-  }
-  const energyPerDay = adults * 2 + toddlers * 2 * ECONOMY.reproduction.childDrainMultiplier;
-  const stockpileEnergy =
-      v.meatStore       * ECONOMY.meat.energyPerUnit
-    + v.cookedMeatStore * ECONOMY.cooking.cookedMeatEnergyPerUnit
-    + v.plantStore      * ECONOMY.fruit.energyPerUnit
-    + v.driedFruitStore * ECONOMY.cooking.driedFruitEnergyPerUnit;
-  const days = energyPerDay > 0 ? Math.floor(stockpileEnergy / energyPerDay) : Infinity;
-  const daysLabel = !isFinite(days) ? '∞' : String(days);
-  return `food=${raw}raw+${cooked}cooked (${daysLabel}d)`;
-}
+// starvationContext moved to demography.ts
 
 // --- Main tick ---
 
@@ -936,80 +894,15 @@ export function tick(state: WorldState): WorldState {
     return a;
   });
 
-  let entities: Entity[] = [];
-  for (const e of aged) {
-    if (e.age >= e.maxAge) {
-      logEvent(e, 'death', { cause: 'old_age' });
-      // Remove from house occupants
-      for (const h of houses) {
-        const idx = h.occupants.indexOf(e.id);
-        if (idx >= 0) h.occupants.splice(idx, 1);
-      }
-    } else if (e.energy <= 0) {
-      logEvent(e, 'death', { cause: 'starvation', detail: starvationContext(e, state.entities, updatedVillages) });
-      for (const h of houses) {
-        const idx = h.occupants.indexOf(e.id);
-        if (idx >= 0) h.occupants.splice(idx, 1);
-      }
-    } else {
-      entities.push(e);
-    }
-  }
+  // --- Step 0a: Remove dead (old age / starvation) — demography.ts ---
+  const deathResult = processDeaths(aged, houses, tickNum, state.entities, updatedVillages);
+  let entities = deathResult.alive;
+  log.push(...deathResult.log);
 
-  // --- Step 0c: Births — pregnancyTimer just hit 0 for these mothers ---
-  const earlyBabies: Entity[] = [];
-  const earlyDeadIds = new Set<string>();
-  for (let mi = 0; mi < entities.length; mi++) {
-    const mother = entities[mi];
-    const wasPregnant = (state.entities.find(o => o.id === mother.id)?.pregnancyTimer ?? 0) > 0;
-    const stillPregnant = mother.pregnancyTimer > 0;
-    if (!wasPregnant || stillPregnant) continue;
-
-    // Birth happens — mother keeps her current state/goal; new baby spawns at her home.
-    // Always single birth (no twinChance — removed).
-    const dadTraits = mother.fatherTraits ?? mother.traits;
-    const birthHome = homePosition(mother, houses);
-    const birthPos = birthHome ? { ...birthHome } : { ...mother.position };
-    {
-      const babyTraits = inheritTraits(dadTraits, mother.traits);
-      const babyGender = Math.random() < 0.5 ? 'male' : 'female' as const;
-      const baby: Entity = {
-        id: generateId('e'),
-        name: randomName(babyGender),
-        position: { ...birthPos },
-        gender: babyGender,
-        activity: IDLE,
-        age: 0,
-        maxAge: randomMaxAge(),
-        color: [...mother.color] as RGB,
-        energy: ECONOMY.metabolism.energyStart,
-        traits: babyTraits,
-        birthCooldown: 0,
-        pregnancyTimer: 0,
-        tribe: (mother.fatherTribe === mother.tribe ? mother.tribe : (Math.random() < 0.5 ? mother.tribe : mother.fatherTribe!)) as TribeId,
-        homeId: birthHome ? mother.homeId : undefined,
-        motherId: mother.id,
-      };
-      if (Math.random() < ECONOMY.reproduction.infantMortality) {
-        logEvent(baby, 'death', { cause: 'starvation', detail: 'infant mortality' });
-      } else {
-        earlyBabies.push(baby);
-        logEvent(baby, 'birth');
-      }
-    }
-    // Reset reproductive state on mother (fatherTraits cleared, birthCooldown applied)
-    entities[mi] = { ...mother, fatherTraits: undefined, birthCooldown: ECONOMY.reproduction.birthCooldown };
-    // Maternal mortality
-    if (Math.random() < ECONOMY.reproduction.maternalMortality) {
-      earlyDeadIds.add(mother.id);
-      logEvent(mother, 'death', { cause: 'childbirth' });
-      for (const h of houses) {
-        const idx = h.occupants.indexOf(mother.id);
-        if (idx >= 0) h.occupants.splice(idx, 1);
-      }
-    }
-  }
-  entities = entities.filter(e => !earlyDeadIds.has(e.id)).concat(earlyBabies);
+  // --- Step 0c: Births — pregnancyTimer just hit 0 for these mothers — demography.ts ---
+  const birthResult = processBirths(entities, state.entities, houses, tickNum, generateId);
+  entities = birthResult.entities;
+  log.push(...birthResult.log);
 
   // --- Step 0b: Validate homeId — remove if entity not in house's occupants ---
   for (let i = 0; i < entities.length; i++) {
