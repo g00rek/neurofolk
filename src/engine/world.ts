@@ -152,12 +152,13 @@ function neighbors(p: Position, gridSize: number): Position[] {
 }
 
 
-// BFS pathfinding — finds shortest path around obstacles (houses, water, mountains, occupied tiles).
+// A* pathfinding — finds shortest path around obstacles (houses, water, mountains, occupied tiles).
 // Returns the FIRST step on the shortest path from `from` to `to`.
-// Target tile itself may be impassable (e.g. stockpile tile for deposit) — reachable
+// Uses manhattan heuristic to search toward target — handles any map size efficiently.
+// Target tile itself may be impassable (e.g. mountain for mining) — reachable
 // as destination but won't be expanded through.
-// `moveGrid` (optional) makes BFS route AROUND tiles already occupied by other entities.
-const BFS_BUDGET = 400;
+// `moveGrid` (optional) routes AROUND tiles occupied by other entities.
+const PATHFIND_BUDGET = 2000;
 function stepToward(
   from: Position, to: Position,
   biomes: Biome[][], gridSize: number,
@@ -165,46 +166,79 @@ function stepToward(
   moveGrid?: number[][],
 ): Position {
   if (from.x === to.x && from.y === to.y) return from;
-  const queue: Array<{ pos: Position; firstStep: Position | null }> = [{ pos: from, firstStep: null }];
-  const visited = new Set<string>();
-  visited.add(`${from.x},${from.y}`);
+
+  // Min-heap on f = g (steps taken) + h (manhattan to target)
+  type Node = { f: number; g: number; x: number; y: number; firstStep: Position | null };
+  const heap: Node[] = [];
+  const siftUp = (i: number) => {
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (heap[p].f <= heap[i].f) break;
+      [heap[p], heap[i]] = [heap[i], heap[p]];
+      i = p;
+    }
+  };
+  const siftDown = () => {
+    let i = 0;
+    const len = heap.length;
+    while (true) {
+      let s = i;
+      const l = 2 * i + 1, r = l + 1;
+      if (l < len && heap[l].f < heap[s].f) s = l;
+      if (r < len && heap[r].f < heap[s].f) s = r;
+      if (s === i) break;
+      [heap[s], heap[i]] = [heap[i], heap[s]];
+      i = s;
+    }
+  };
+  const push = (n: Node) => { heap.push(n); siftUp(heap.length - 1); };
+  const pop = (): Node => {
+    const top = heap[0];
+    const last = heap.pop()!;
+    if (heap.length > 0) { heap[0] = last; siftDown(); }
+    return top;
+  };
+
+  const h = (x: number, y: number) => Math.abs(x - to.x) + Math.abs(y - to.y);
+  const visited = new Map<string, number>(); // key → best g score
+
+  push({ f: h(from.x, from.y), g: 0, x: from.x, y: from.y, firstStep: null });
+  visited.set(`${from.x},${from.y}`, 0);
+
   let iters = 0;
-  while (queue.length && iters < BFS_BUDGET) {
+  const dirs: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+  while (heap.length > 0 && iters < PATHFIND_BUDGET) {
     iters++;
-    const { pos, firstStep } = queue.shift()!;
-    if (pos.x === to.x && pos.y === to.y) return firstStep ?? pos;
-    const dirs: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const cur = pop();
+
+    if (cur.x === to.x && cur.y === to.y) return cur.firstStep ?? { x: cur.x, y: cur.y };
+
+    // Skip stale entries (a shorter path to this node was found after queuing)
+    const ck = `${cur.x},${cur.y}`;
+    if ((visited.get(ck) ?? Infinity) < cur.g) continue;
+
     for (const [dx, dy] of dirs) {
-      const nx = pos.x + dx;
-      const ny = pos.y + dy;
-      const key = `${nx},${ny}`;
-      if (visited.has(key)) continue;
-      visited.add(key);
-      const candidate = { x: nx, y: ny };
+      const nx = cur.x + dx, ny = cur.y + dy;
+      const nk = `${nx},${ny}`;
       const isTarget = nx === to.x && ny === to.y;
+
       if (!isTarget) {
-        if (!isValidMove(candidate, biomes, gridSize, blockedTiles)) continue;
-        // Skip occupied tiles — entities path around each other (no stacking).
+        if (!isValidMove({ x: nx, y: ny }, biomes, gridSize, blockedTiles)) continue;
         if (moveGrid && moveGrid[ny][nx] >= MAX_ENTITIES_PER_TILE) continue;
       }
-      queue.push({ pos: candidate, firstStep: firstStep ?? candidate });
+
+      const g = cur.g + 1;
+      if ((visited.get(nk) ?? Infinity) <= g) continue;
+      visited.set(nk, g);
+
+      const firstStep = cur.firstStep ?? { x: nx, y: ny };
+      push({ f: g + h(nx, ny), g, x: nx, y: ny, firstStep });
     }
   }
-  // BFS exhausted budget — fall back to greedy step (nearest passable neighbor toward target).
-  // This keeps entities moving toward distant targets (e.g., gold deposits on large maps)
-  // even when BFS can't plan the full path in one tick.
-  const fallbackDirs: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  let bestStep = from;
-  let bestDist = Math.abs(from.x - to.x) + Math.abs(from.y - to.y);
-  for (const [dx, dy] of fallbackDirs) {
-    const nx = from.x + dx, ny = from.y + dy;
-    const candidate = { x: nx, y: ny };
-    if (!isValidMove(candidate, biomes, gridSize, blockedTiles)) continue;
-    if (moveGrid && moveGrid[ny][nx] >= MAX_ENTITIES_PER_TILE) continue;
-    const d = Math.abs(nx - to.x) + Math.abs(ny - to.y);
-    if (d < bestDist) { bestDist = d; bestStep = candidate; }
-  }
-  return bestStep;
+
+  // Truly unreachable (surrounded by impassable terrain)
+  return from;
 }
 
 function randomPos(gridSize: number): Position {
