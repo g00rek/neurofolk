@@ -141,7 +141,7 @@ export interface RoleConfig {
 
 export const ROLES: Record<Gender, RoleConfig> = {
   female: {
-    actions: { gather: 1.0, cook: 1.0, deposit: 1.0, mine: 0.8, rest: 1.0, play: 1.0 }
+    actions: { gather: 1.0, cook: 1.0, deposit: 1.0, rest: 1.0, play: 1.0 }
   },
   male: {
     actions: { hunt: 1.0, chop: 0.9, build: 1.0, mine: 1.0, deposit: 1.0, rest: 1.0, play: 1.0 }
