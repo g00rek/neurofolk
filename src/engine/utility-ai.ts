@@ -2,10 +2,8 @@ import type { Entity, Activity, Pace, Purpose, Position, Animal, Tree, House, Vi
 import {
   CHILD_AGE,
   ANIMAL_HUNT_MIN_POPULATION, scaled,
-  HUNGER_THRESHOLD,
   NEAR_HOME_RANGE,
   HOUSE_CAPACITY,
-  HOUSE_WOOD_COST,
   HOUSE_SIZE,
   VILLAGE_EAT_RANGE,
   TICKS_PER_YEAR,
@@ -270,15 +268,15 @@ function survivalForageAction(ctx: AIContext, survivalScore: number): AIAction |
 // tops them up there. Firing preemptive in-zone would loop entity on stockpile arrivals.
 function scoreSurvival(ctx: AIContext): number {
   if (ctx.entity.energy < 20) return 1.0;
-  if (ctx.entity.energy < HUNGER_THRESHOLD) return 0.6;
-  if (ctx.entity.energy < HUNGER_THRESHOLD + 20) return ctx.inEatZone ? 0 : 0.25;
+  if (ctx.entity.energy < ECONOMY.metabolism.hungerThreshold) return 0.6;
+  if (ctx.entity.energy < ECONOMY.metabolism.hungerThreshold + 20) return ctx.inEatZone ? 0 : 0.25;
   return 0;
 }
 
 function scoreBuildHome(ctx: AIContext): number {
   if (ageInYears(ctx.entity) < CHILD_AGE) return 0;
   if (!ctx.villageNeedsHouses) return 0;
-  if (!ctx.village || ctx.village.woodStore < HOUSE_WOOD_COST) return 0; // not enough wood yet → go chop
+  if (!ctx.village || ctx.village.woodStore < ECONOMY.wood.houseCost) return 0; // not enough wood yet → go chop
   // Hands full — deposit first so we can carry tools at build site
   if (ctx.entity.carrying && ctx.entity.carrying.amount > 0) return 0;
   return 1.0; // top-tier priority — shelter prevents homeless-baby deaths
@@ -292,9 +290,9 @@ function scoreChopWood(ctx: AIContext): number {
   // Hands full — must deposit before chopping more
   if (ctx.entity.carrying && ctx.entity.carrying.amount > 0) return 0;
   if (!ctx.villageNeedsHouses) return 0;
-  const woodTarget = HOUSE_WOOD_COST * 2; // enough for current build + next
+  const woodTarget = ECONOMY.wood.houseCost * 2; // enough for current build + next
   if (ctx.village.woodStore >= woodTarget) return 0;
-  if (ctx.village.woodStore < HOUSE_WOOD_COST) return 1.0; // urgent — can't build yet
+  if (ctx.village.woodStore < ECONOMY.wood.houseCost) return 1.0; // urgent — can't build yet
   const woodNeed = (woodTarget - ctx.village.woodStore) / woodTarget;
   return woodNeed * 0.95;
 }

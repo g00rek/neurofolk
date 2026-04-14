@@ -1,14 +1,12 @@
 import type { Entity, Animal, Tree, House, Position, WorldState, RGB, Traits, LogEntry, Biome, Village, TribeId, DeathCause, Activity, Purpose, Action, Pace, GoldDeposit } from './types';
 import {
-  MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE, TICKS_PER_YEAR,
-  PREGNANCY_DURATION, BIRTH_COOLDOWN, INFANT_MORTALITY, MATERNAL_MORTALITY, TICKS_PER_DAY,
-  ENERGY_MAX, ENERGY_START, ENERGY_DRAIN_INTERVAL, ENERGY_MEAT, ENERGY_PLANT,
-  HUNGER_THRESHOLD, CHILD_AGE,
+  MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE, TICKS_PER_YEAR, TICKS_PER_DAY,
+  CHILD_AGE,
   ANIMAL_COUNT, scaled,
-  FIGHT_MIN_AGE, MEAT_PORTIONS_PER_HUNT, TREE_FRUIT_PORTIONS,
+  FIGHT_MIN_AGE,
   ANIMAL_REPRO_INTERVAL, FOREST_SPEED_PENALTY,
-  WOOD_PER_CHOP, VILLAGE_EAT_RANGE, MAX_ENTITIES_PER_TILE,
-  HUNT_KILL_RANGE, HOUSE_WOOD_COST, HOUSE_CAPACITY, HOUSE_SIZE,
+  VILLAGE_EAT_RANGE, MAX_ENTITIES_PER_TILE,
+  HUNT_KILL_RANGE, HOUSE_CAPACITY, HOUSE_SIZE,
   ANIMAL_ENERGY_MAX, ANIMAL_ENERGY_START, ANIMAL_ENERGY_DRAIN,
   ANIMAL_DRAIN_INTERVAL, ANIMAL_REPRO_MIN_ENERGY, GRASS_MAX_PER_TILE,
   ACTION_DURATION, RUN_ENERGY_MULTIPLIER,
@@ -51,7 +49,7 @@ function isReproductive(e: Entity): boolean {
 }
 
 function isHungry(e: Entity): boolean {
-  return e.energy < HUNGER_THRESHOLD;
+  return e.energy < ECONOMY.metabolism.hungerThreshold;
 }
 
 function isChild(e: Entity): boolean {
@@ -182,9 +180,9 @@ function resolveBuildArrival(
   houses: House[], villages: Village[], getVillage: GetVillageFn,
 ): Entity {
   const v = getVillage(entity.tribe);
-  if (!v || v.woodStore < HOUSE_WOOD_COST) return { ...entity, activity: IDLE };
+  if (!v || v.woodStore < ECONOMY.wood.houseCost) return { ...entity, activity: IDLE };
   if (!isValidBuildSite(entity.position.x, entity.position.y, biomes, gridSize, houses, villages)) return { ...entity, activity: IDLE };
-  v.woodStore -= HOUSE_WOOD_COST;
+  v.woodStore -= ECONOMY.wood.houseCost;
   return { ...entity, activity: startWork('building') };
 }
 
@@ -203,7 +201,7 @@ function completeHunting(entity: Entity, animals: Animal[], logEvent: LogEventFn
   const preyIdx = animals.findIndex(a => manhattan(a.position, entity.position) <= HUNT_KILL_RANGE);
   if (preyIdx < 0) return { ...entity, activity: IDLE };
   animals.splice(preyIdx, 1);
-  const direct = eatDirectlyToThreshold(entity, ENERGY_MEAT, MEAT_PORTIONS_PER_HUNT);
+  const direct = eatDirectlyToThreshold(entity, ECONOMY.meat.energyPerUnit, ECONOMY.meat.unitsPerHunt);
   const updated: Entity = {
     ...direct.entity,
     activity: IDLE,
@@ -224,7 +222,7 @@ function completeGathering(entity: Entity, trees: Tree[]): Entity {
     fruitPortions: trees[treeIdx].fruitPortions - 1,
     hasFruit: trees[treeIdx].fruitPortions > 1,
   };
-  const direct = eatDirectlyToThreshold(entity, ENERGY_PLANT, ECONOMY.fruit.unitsPerPick);
+  const direct = eatDirectlyToThreshold(entity, ECONOMY.fruit.energyPerUnit, ECONOMY.fruit.unitsPerPick);
   const carrying = direct.remainingPortions > 0
     ? { type: 'fruit' as const, amount: direct.remainingPortions }
     : undefined;
@@ -238,12 +236,12 @@ function completeChopping(entity: Entity, trees: Tree[], tickNum: number, logEve
   if (treeIdx >= 0) {
     trees[treeIdx] = { ...trees[treeIdx], chopped: true, choppedAt: tickNum, hasFruit: false, fruitPortions: 0 };
   }
-  logEvent(entity, 'chop', { detail: `+${WOOD_PER_CHOP} wood` });
+  logEvent(entity, 'chop', { detail: `+${ECONOMY.wood.unitsPerChop} wood` });
   return {
     ...entity,
     activity: IDLE,
     energy: Math.max(0, entity.energy - 10),
-    carrying: { type: 'wood' as const, amount: WOOD_PER_CHOP },
+    carrying: { type: 'wood' as const, amount: ECONOMY.wood.unitsPerChop },
   };
 }
 
@@ -331,8 +329,8 @@ function depositCarrying(entity: Entity, getVillage: GetVillageFn): Entity {
 function eatDirectlyToThreshold(entity: Entity, portionEnergy: number, availablePortions: number): { entity: Entity; remainingPortions: number } {
   let remaining = availablePortions;
   let energy = entity.energy;
-  while (remaining > 0 && energy < HUNGER_THRESHOLD) {
-    energy = Math.min(ENERGY_MAX, energy + portionEnergy);
+  while (remaining > 0 && energy < ECONOMY.metabolism.hungerThreshold) {
+    energy = Math.min(ECONOMY.metabolism.energyMax, energy + portionEnergy);
     remaining--;
   }
   if (energy === entity.energy) return { entity, remainingPortions: remaining };
@@ -642,7 +640,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
           50 + Math.floor(Math.random() * 206),
           50 + Math.floor(Math.random() * 206),
         ] as RGB,
-        energy: ENERGY_START,
+        energy: ECONOMY.metabolism.energyStart,
         traits,
         tribe,
         birthCooldown: 0,
@@ -703,7 +701,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
           chopped: false,
           fruiting: isFruitTree,
           hasFruit: isFruitTree,
-          fruitPortions: isFruitTree ? TREE_FRUIT_PORTIONS : 0,
+          fruitPortions: isFruitTree ? ECONOMY.fruit.treeCapacity : 0,
         });
       }
     }
@@ -837,7 +835,7 @@ function pheromoneMating(entities: Entity[], villages: Village[], _houses: House
       if (Math.random() >= matingChance) continue;
 
       // Pregnancy runs in parallel with activity — woman keeps doing whatever she was doing.
-      const pregTime = PREGNANCY_DURATION;
+      const pregTime = ECONOMY.reproduction.pregnancyTicks;
       updated[fi] = {
         ...female,
         pregnancyTimer: pregTime,
@@ -931,7 +929,7 @@ export function tick(state: WorldState): WorldState {
     //   toddlers (infantAge..CHILD_AGE): partial drain (childDrainMultiplier), can eat
     //   adults (CHILD_AGE+): full drain, full eating
     //   homeless in winter: 2× drain (cold exposure — incentive to build houses in time)
-    if (!isInfant(a) && a.age % ENERGY_DRAIN_INTERVAL === 0) {
+    if (!isInfant(a) && a.age % ECONOMY.metabolism.drainInterval === 0) {
       const baseDrain = 1;
       const hungerMod = isHungry(a) ? 0.5 : 1.0;
       const ageMod = isChild(a) ? ECONOMY.reproduction.childDrainMultiplier : 1.0;
@@ -943,11 +941,11 @@ export function tick(state: WorldState): WorldState {
       let fed = false;
       // Eat from what you're carrying
       if (a.carrying && a.carrying.amount > 0) {
-        const energyGain = a.carrying.type === 'meat' ? ENERGY_MEAT : a.carrying.type === 'fruit' ? ENERGY_PLANT : 0;
+        const energyGain = a.carrying.type === 'meat' ? ECONOMY.meat.energyPerUnit : a.carrying.type === 'fruit' ? ECONOMY.fruit.energyPerUnit : 0;
         if (energyGain > 0) {
           a.carrying = { ...a.carrying, amount: a.carrying.amount - 1 };
           if (a.carrying.amount <= 0) a.carrying = undefined;
-          a.energy = Math.min(ENERGY_MAX, a.energy + energyGain);
+          a.energy = Math.min(ECONOMY.metabolism.energyMax, a.energy + energyGain);
           fed = true;
         }
       }
@@ -956,13 +954,13 @@ export function tick(state: WorldState): WorldState {
         const myV = getVillage(a.tribe);
         if (myV && isInVillage(a.position, a.tribe, myV, houses)) {
           if (myV.cookedMeatStore > 0) {
-            myV.cookedMeatStore -= 1; a.energy = Math.min(ENERGY_MAX, a.energy + ECONOMY.cooking.cookedMeatEnergyPerUnit); fed = true;
+            myV.cookedMeatStore -= 1; a.energy = Math.min(ECONOMY.metabolism.energyMax, a.energy + ECONOMY.cooking.cookedMeatEnergyPerUnit); fed = true;
           } else if (myV.driedFruitStore > 0) {
-            myV.driedFruitStore -= 1; a.energy = Math.min(ENERGY_MAX, a.energy + ECONOMY.cooking.driedFruitEnergyPerUnit); fed = true;
+            myV.driedFruitStore -= 1; a.energy = Math.min(ECONOMY.metabolism.energyMax, a.energy + ECONOMY.cooking.driedFruitEnergyPerUnit); fed = true;
           } else if (myV.meatStore > 0) {
-            myV.meatStore -= 1; a.energy = Math.min(ENERGY_MAX, a.energy + ENERGY_MEAT); fed = true;
+            myV.meatStore -= 1; a.energy = Math.min(ECONOMY.metabolism.energyMax, a.energy + ECONOMY.meat.energyPerUnit); fed = true;
           } else if (myV.plantStore > 0) {
-            myV.plantStore -= 1; a.energy = Math.min(ENERGY_MAX, a.energy + ENERGY_PLANT); fed = true;
+            myV.plantStore -= 1; a.energy = Math.min(ECONOMY.metabolism.energyMax, a.energy + ECONOMY.fruit.energyPerUnit); fed = true;
           }
         }
       }
@@ -1016,7 +1014,7 @@ export function tick(state: WorldState): WorldState {
         age: 0,
         maxAge: randomMaxAge(),
         color: [...mother.color] as RGB,
-        energy: ENERGY_START,
+        energy: ECONOMY.metabolism.energyStart,
         traits: babyTraits,
         birthCooldown: 0,
         pregnancyTimer: 0,
@@ -1024,7 +1022,7 @@ export function tick(state: WorldState): WorldState {
         homeId: birthHome ? mother.homeId : undefined,
         motherId: mother.id,
       };
-      if (Math.random() < INFANT_MORTALITY) {
+      if (Math.random() < ECONOMY.reproduction.infantMortality) {
         logEvent(baby, 'death', { cause: 'starvation', detail: 'infant mortality' });
       } else {
         earlyBabies.push(baby);
@@ -1032,9 +1030,9 @@ export function tick(state: WorldState): WorldState {
       }
     }
     // Reset reproductive state on mother (fatherTraits cleared, birthCooldown applied)
-    entities[mi] = { ...mother, fatherTraits: undefined, birthCooldown: BIRTH_COOLDOWN };
+    entities[mi] = { ...mother, fatherTraits: undefined, birthCooldown: ECONOMY.reproduction.birthCooldown };
     // Maternal mortality
-    if (Math.random() < MATERNAL_MORTALITY) {
+    if (Math.random() < ECONOMY.reproduction.maternalMortality) {
       earlyDeadIds.add(mother.id);
       logEvent(mother, 'death', { cause: 'childbirth' });
       for (const h of houses) {
@@ -1526,12 +1524,12 @@ export function tick(state: WorldState): WorldState {
 
     if (isSpring && t.fruiting && !t.hasFruit) {
       // Some trees fruit early: ~0.3% per tick → ~40% by end of spring
-      if (Math.random() < 0.003) return { ...t, fruitPortions: TREE_FRUIT_PORTIONS, hasFruit: true };
+      if (Math.random() < 0.003) return { ...t, fruitPortions: ECONOMY.fruit.treeCapacity, hasFruit: true };
     }
 
     if (isSummer && t.fruiting && !t.hasFruit) {
       // Most trees fruit: ~2% per tick → virtually all by mid-summer
-      if (Math.random() < 0.02) return { ...t, fruitPortions: TREE_FRUIT_PORTIONS, hasFruit: true };
+      if (Math.random() < 0.02) return { ...t, fruitPortions: ECONOMY.fruit.treeCapacity, hasFruit: true };
     }
 
     return t;

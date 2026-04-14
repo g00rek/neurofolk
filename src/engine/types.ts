@@ -135,10 +135,6 @@ export const ECONOMY = {
   },
 } as const;
 
-// Aliases (backward-compat) — derive from ECONOMY for clarity in existing call sites.
-export const WOOD_PER_CHOP = ECONOMY.wood.unitsPerChop;
-export const HOUSE_WOOD_COST = ECONOMY.wood.houseCost;
-
 export interface Entity {
   id: string;
   name: string;
@@ -159,8 +155,6 @@ export interface Entity {
   fatherTribe?: TribeId;
   carrying?: { type: 'meat' | 'wood' | 'fruit' | 'gold'; amount: number };
 }
-
-export const MEAT_PORTIONS_PER_HUNT = ECONOMY.meat.unitsPerHunt;
 
 // Traits
 export interface Animal {
@@ -222,7 +216,7 @@ export interface Tree {
   choppedAt?: number;   // tick when chopped
   fruiting: boolean;    // true = fruit tree (can bear fruit)
   hasFruit: boolean;    // true = fruit ready to pick
-  fruitPortions: number; // harvestable fruit portions (0 = empty, up to TREE_FRUIT_PORTIONS)
+  fruitPortions: number; // harvestable fruit portions (0 = empty, up to ECONOMY.fruit.treeCapacity)
 }
 
 export interface GoldDeposit {
@@ -231,8 +225,6 @@ export interface GoldDeposit {
   remaining: number;    // portions left; 0 = depleted
   depletedAt?: number;  // tick when exhausted (for future rendering/cleanup)
 }
-
-export const TREE_FRUIT_PORTIONS = ECONOMY.fruit.treeCapacity;
 
 export const FIGHT_MIN_AGE = 16;
 export const CHOPPING_DURATION = 5;  // half day
@@ -255,20 +247,8 @@ export const MIN_REPRODUCTIVE_AGE = 12;
 export const MAX_REPRODUCTIVE_AGE = 40;
 export const TICKS_PER_YEAR = 2400; // 20 ticks/day × 10 days/month × 12 months
 
-// Actions (reproduction aliases → ECONOMY.reproduction)
-export const PREGNANCY_DURATION = ECONOMY.reproduction.pregnancyTicks;
-export const BIRTH_COOLDOWN = ECONOMY.reproduction.birthCooldown;
 export const FIGHTING_DURATION = 5;   // half day
-// Energy (aliases to ECONOMY.metabolism)
-export const ENERGY_MAX = ECONOMY.metabolism.energyMax;
-export const ENERGY_START = ECONOMY.metabolism.energyStart;
-export const ENERGY_DRAIN_INTERVAL = ECONOMY.metabolism.drainInterval;
-export const ENERGY_MEAT = ECONOMY.meat.energyPerUnit;
-export const ENERGY_PLANT = ECONOMY.fruit.energyPerUnit;
-export const HUNGER_THRESHOLD = ECONOMY.metabolism.hungerThreshold;
 export const CHILD_AGE = 3; // children don't work/fight/lose energy (years)
-export const INFANT_MORTALITY = ECONOMY.reproduction.infantMortality;
-export const MATERNAL_MORTALITY = ECONOMY.reproduction.maternalMortality;
 
 // Resources — base values tuned for 30×30 (900 tiles)
 export const ANIMAL_COUNT = 20;

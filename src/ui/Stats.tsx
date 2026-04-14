@@ -1,5 +1,5 @@
 import type { WorldState, Entity } from '../engine/types';
-import { TICKS_PER_YEAR, TICKS_PER_DAY, CHILD_AGE, ECONOMY, HOUSE_CAPACITY, HOUSE_WOOD_COST } from '../engine/types';
+import { TICKS_PER_YEAR, TICKS_PER_DAY, CHILD_AGE, ECONOMY, HOUSE_CAPACITY } from '../engine/types';
 import { ageInYears } from '../engine/world';
 import {
   Axe,
@@ -211,7 +211,7 @@ export function Stats({ world }: StatsProps) {
           const supply = freeSlots + inProgress * HOUSE_CAPACITY;
           const needHouses = demand > supply;
           const missing = Math.max(0, Math.ceil((demand - supply) / HOUSE_CAPACITY));
-          const enoughWood = v.woodStore >= HOUSE_WOOD_COST;
+          const enoughWood = v.woodStore >= ECONOMY.wood.houseCost;
 
           return (
             <div key={v.tribe} style={{ fontSize: '11px', marginBottom: '6px' }}>
