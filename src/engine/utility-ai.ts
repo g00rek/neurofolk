@@ -192,9 +192,12 @@ export interface AIContext {
 // Food-security thresholds (days of stockpile projected against tribe drain).
 // Below PANIC → top priority hunt/gather. Below COMFORT → secondary priority.
 // Above COMFORT → no food-work, free time for other activities.
+// Thresholds on *surplus-beyond-winter* days-of-food. Since daysOfFood subtracts the
+// upcoming Long Winter's needs, these represent how much *extra* pantry beyond the
+// winter reserve justifies relaxation. 180 surplus days = ~3 winters stocked ahead.
 const FOOD_PANIC_DAYS = 15;
-const FOOD_COMFORT_DAYS = 30;
-const FOOD_SURPLUS_DAYS = 60;
+const FOOD_COMFORT_DAYS = 60;
+const FOOD_SURPLUS_DAYS = 180;
 
 // --- Scoring functions (0-1, higher = more urgent) ---
 
@@ -299,9 +302,9 @@ function scoreChopWood(ctx: AIContext): number {
 
   const winterWood = ctx.tribePopulation * RUNTIME_CONFIG.passivePhaseYears * ECONOMY.winter.woodPerPersonPerYear;
   const houseReserve = ctx.villageNeedsHouses ? ECONOMY.wood.houseCost : 0;
-  // +50% buffer: winter consumption fluctuates with pop growth; a buffer prevents tight
-  // cycles where wood barely covers need and next cycle starts with near-zero reserve.
-  const woodTarget = Math.ceil(winterWood * 1.5) + houseReserve;
+  // Large buffer (5× winter need + absolute floor): prevents entire active phase of idle
+  // men once the first winter's worth is met. Small tribes especially need high ceilings.
+  const woodTarget = Math.max(40, Math.ceil(winterWood * 5)) + houseReserve;
 
   if (ctx.village.woodStore >= woodTarget) return 0;
 
@@ -309,16 +312,14 @@ function scoreChopWood(ctx: AIContext): number {
   // wood drops below hunt/gather so men replenish food first.
   const foodUrgency = foodWorkUrgency(ctx.daysOfFood);
 
-  // Winter wood not covered.
+  // Winter wood not covered — urgent.
   if (ctx.village.woodStore < winterWood) {
-    if (foodUrgency >= 0.7) return 0.6;  // below hunt (0.7), above play
-    return 1.0;                           // food secure → top priority chopping
+    return foodUrgency >= 0.7 ? 0.6 : 1.0;
   }
-  // Winter covered, just need house wood.
-  if (ctx.villageNeedsHouses && ctx.village.woodStore < winterWood + ECONOMY.wood.houseCost) {
-    return foodUrgency >= 0.7 ? 0.5 : 0.95;
-  }
-  return 0;
+  // Baseline winter covered; keep chopping to build multi-winter buffer.
+  // House-need bumps priority if the village is also constructing.
+  if (foodUrgency >= 0.7) return 0.3; // below hunt/gather when food tight
+  return ctx.villageNeedsHouses ? 0.75 : 0.6;
 }
 
 // Gold mining — always active while gold exists on the map. Never idle when there's
@@ -336,15 +337,14 @@ function scoreMineGold(ctx: AIContext): number {
 
 // Hunt urgency driven by tribe's days-of-food buffer, throttled by animal-to-human ratio
 // so hunting doesn't wipe out the herd when food is comfortable but animals are few.
+// Minimum 0.3 while animals exist — even a well-fed tribe stockpiles for future winters.
 function scoreHunt(ctx: AIContext): number {
   if (ageInYears(ctx.entity) < CHILD_AGE) return 0;
   if (!ctx.village) return 0;
   if (ctx.animalPopulation === 0) return 0;
   if (ctx.entity.carrying && ctx.entity.carrying.amount > 0) return 0;
 
-  const urgency = foodWorkUrgency(ctx.daysOfFood);
-  if (urgency === 0) return 0;
-
+  const urgency = Math.max(0.3, foodWorkUrgency(ctx.daysOfFood));
   // Sustainability: full score with 1.5+ animals per tribe member, throttled below.
   const ratio = ctx.animalPopulation / Math.max(1, ctx.tribePopulation);
   const sustainability = Math.min(1, ratio / 1.5);
