@@ -6,7 +6,7 @@
  * aging, old-age deaths, consumption, starvation, mating, births.
  */
 
-import type { Entity, House, LogEntry, DeathRecord, Village } from './types';
+import type { Entity, House, LogEntry, DeathRecord, Village, TribeId } from './types';
 import { TICKS_PER_YEAR, ECONOMY } from './types';
 
 /** Age every entity by `years` Earth-years. Returns new array; does not mutate input. */
@@ -98,4 +98,44 @@ export function applyConsumption(
   const woodDeficitPeople = woodNeeded > 0 ? Math.ceil(woodNeeded / perPersonYearWood) : 0;
 
   return { foodDeficitPeople, woodDeficitPeople };
+}
+
+/**
+ * Kill N lowest-energy entities in the given tribe. Returns the alive subset.
+ * Mutates house occupants. Appends log + deaths.
+ */
+export function applyStarvationDeaths(
+  entities: Entity[],
+  tribe: TribeId,
+  n: number,
+  houses: House[],
+  tickNum: number,
+  log: LogEntry[],
+  deaths: DeathRecord[],
+): Entity[] {
+  if (n <= 0) return entities;
+  const tribeMembers = entities.filter(e => e.tribe === tribe);
+  const doomed = [...tribeMembers]
+    .sort((a, b) => a.energy - b.energy)
+    .slice(0, n);
+  const doomedIds = new Set(doomed.map(e => e.id));
+
+  for (const e of doomed) {
+    log.push({
+      tick: tickNum, type: 'death',
+      entityId: e.id, name: e.name, gender: e.gender, age: e.age,
+      cause: 'starvation', detail: 'Long Winter',
+    });
+    deaths.push({
+      entityId: e.id, name: e.name, gender: e.gender,
+      ageYears: Math.floor(e.age / TICKS_PER_YEAR),
+      cause: 'starvation', detail: 'Long Winter',
+    });
+    for (const h of houses) {
+      const idx = h.occupants.indexOf(e.id);
+      if (idx >= 0) h.occupants.splice(idx, 1);
+    }
+  }
+
+  return entities.filter(e => !doomedIds.has(e.id));
 }

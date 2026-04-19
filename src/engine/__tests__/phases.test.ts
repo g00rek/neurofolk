@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ageAll, applyOldAgeDeaths, applyConsumption } from '../phases';
+import { ageAll, applyOldAgeDeaths, applyConsumption, applyStarvationDeaths } from '../phases';
 import { TICKS_PER_YEAR } from '../types';
 import type { Entity, House, LogEntry, DeathRecord, Village } from '../types';
 
@@ -104,5 +104,31 @@ describe('applyConsumption', () => {
     expect(v.cookedMeatStore).toBe(0);
     expect(v.driedFruitStore).toBeLessThan(10);
     expect(v.driedFruitStore).toBeGreaterThanOrEqual(7);
+  });
+});
+
+describe('applyStarvationDeaths', () => {
+  it('kills the N lowest-energy entities in the given tribe', () => {
+    const entities = [
+      makeEntity({ id: 'a', tribe: 0, energy: 80 }),
+      makeEntity({ id: 'b', tribe: 0, energy: 10 }),
+      makeEntity({ id: 'c', tribe: 0, energy: 30 }),
+      makeEntity({ id: 'd', tribe: 1, energy: 5 }),
+    ];
+    const houses: House[] = [];
+    const log: LogEntry[] = [];
+    const deaths: DeathRecord[] = [];
+    const alive = applyStarvationDeaths(entities, 0, 2, houses, 500, log, deaths);
+    // Tribe 0: kill 2 lowest = b (10) and c (30). a survives. d is tribe 1, untouched.
+    expect(alive.map(e => e.id).sort()).toEqual(['a', 'd']);
+    expect(log).toHaveLength(2);
+    expect(log[0].cause).toBe('starvation');
+    expect(deaths).toHaveLength(2);
+  });
+
+  it('no-op when N = 0', () => {
+    const entities = [makeEntity({ id: 'a', tribe: 0, energy: 10 })];
+    const alive = applyStarvationDeaths(entities, 0, 0, [], 0, [], []);
+    expect(alive).toHaveLength(1);
   });
 });
