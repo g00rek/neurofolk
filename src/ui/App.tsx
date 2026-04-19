@@ -268,6 +268,11 @@ export function App() {
     setSelectedId(entity ? entity.id : null);
   }, [world]);
 
+  const handleAdvancePhase = useCallback(() => {
+    workerRef.current?.postMessage({ type: 'advancePhase' });
+    setRunning(true); // auto-resume play after the Long Winter summary
+  }, []);
+
   const handleReset = useCallback(() => {
     const mapSettings = loadMapParams();
     const nextWorld = createWorld({
@@ -429,7 +434,7 @@ export function App() {
           <SummaryModal
             summary={world.lastPassiveSummary}
             villages={world.villages}
-            onContinue={() => workerRef.current?.postMessage({ type: 'advancePhase' })}
+            onContinue={handleAdvancePhase}
           />
         )}
       </div>

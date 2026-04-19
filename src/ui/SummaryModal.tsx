@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { PassiveSummary, Village } from '../engine/types';
 
 interface Props {
@@ -6,7 +7,20 @@ interface Props {
   onContinue: () => void;
 }
 
+const AUTO_CLOSE_SECONDS = 5;
+
 export function SummaryModal({ summary, villages, onContinue }: Props) {
+  const [secondsLeft, setSecondsLeft] = useState(AUTO_CLOSE_SECONDS);
+
+  useEffect(() => {
+    if (secondsLeft <= 0) {
+      onContinue();
+      return;
+    }
+    const id = setTimeout(() => setSecondsLeft(s => s - 1), 1000);
+    return () => clearTimeout(id);
+  }, [secondsLeft, onContinue]);
+
   return (
     <div style={overlayStyle}>
       <div style={modalStyle}>
@@ -43,7 +57,9 @@ export function SummaryModal({ summary, villages, onContinue }: Props) {
             </div>
           );
         })}
-        <button onClick={onContinue} style={buttonStyle}>Begin next Summer</button>
+        <button onClick={onContinue} style={buttonStyle}>
+          Begin next Summer ({secondsLeft}s)
+        </button>
       </div>
     </div>
   );
