@@ -7,7 +7,8 @@
  */
 
 import type {
-  Entity, House, LogEntry, DeathRecord, Village, TribeId, BirthRecord, RGB, Traits,
+  Entity, House, LogEntry, DeathRecord, Village, TribeId,
+  BirthRecord, RGB, Traits, WorldState, PassiveSummary, TribeSummary, Stockpile,
 } from './types';
 import { TICKS_PER_YEAR, ECONOMY, MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE } from './types';
 import { randomName } from './names';
@@ -220,6 +221,17 @@ function randomMaxAgeTicks(): number {
   return years * TICKS_PER_YEAR;
 }
 
+function snapshotStockpile(v: Village): Stockpile {
+  return {
+    meat: v.meatStore,
+    plant: v.plantStore,
+    cookedMeat: v.cookedMeatStore,
+    driedFruit: v.driedFruitStore,
+    wood: v.woodStore,
+    gold: v.goldStore,
+  };
+}
+
 /**
  * Resolve all pending pregnancies (pregnancyTimer > 0). For each:
  *   1. Roll infant mortality → baby created or not
@@ -315,4 +327,103 @@ export function resolveBirths(
     }
   }
   return result;
+}
+
+/**
+ * Collapse N Earth-years of passive time into one deterministic step.
+ * Steps: age → old-age deaths → consumption → starvation → mating → births.
+ * Returns new world (phase='summary', phaseTick=0, lastPassiveSummary filled) + summary.
+ */
+export function computePassivePhase(
+  world: WorldState,
+  years: number,
+  generateId: () => string,
+): { world: WorldState; summary: PassiveSummary } {
+  // Clone arrays we'll mutate.
+  const houses = world.houses.map(h => ({ ...h, occupants: [...h.occupants] }));
+  const villages = world.villages.map(v => ({ ...v }));
+  const log: LogEntry[] = [...world.log];
+
+  const stockpileBeforeByTribe = new Map<TribeId, Stockpile>();
+  for (const v of villages) stockpileBeforeByTribe.set(v.tribe, snapshotStockpile(v));
+
+  // Per-tribe bookkeeping for summary.
+  const birthsByTribe = new Map<TribeId, BirthRecord[]>();
+  const deathsByTribe = new Map<TribeId, DeathRecord[]>();
+  for (const v of villages) {
+    birthsByTribe.set(v.tribe, []);
+    deathsByTribe.set(v.tribe, []);
+  }
+
+  // 1. Aging.
+  let entities = ageAll(world.entities, years);
+
+  // 2. Old-age deaths, tracked per-tribe.
+  {
+    const deathsBucket: DeathRecord[] = [];
+    entities = applyOldAgeDeaths(entities, houses, world.tick, log, deathsBucket);
+    for (const d of deathsBucket) {
+      const tribe = world.entities.find(e => e.id === d.entityId)?.tribe ?? 0;
+      deathsByTribe.get(tribe)?.push(d);
+    }
+  }
+
+  // 3 + 4. Consumption + starvation per tribe.
+  for (const v of villages) {
+    const pop = entities.filter(e => e.tribe === v.tribe).length;
+    if (pop === 0) continue;
+    const { foodDeficitPeople, woodDeficitPeople } = applyConsumption(v, pop, years);
+    const deficit = Math.max(foodDeficitPeople, woodDeficitPeople);
+    if (deficit > 0) {
+      const deathsBucket: DeathRecord[] = [];
+      entities = applyStarvationDeaths(entities, v.tribe, deficit, houses, world.tick, log, deathsBucket);
+      for (const d of deathsBucket) deathsByTribe.get(v.tribe)?.push(d);
+    }
+  }
+
+  // 5. Mating.
+  entities = runMatingRound(entities, log, world.tick);
+
+  // 6. Births. Per-tribe bookkeeping by looking up mother's tribe.
+  {
+    const birthBucket: BirthRecord[] = [];
+    const deathBucket: DeathRecord[] = [];
+    const before = new Map(entities.map(e => [e.id, e.tribe]));
+    entities = resolveBirths(entities, houses, world.tick, log, birthBucket, deathBucket, generateId);
+    for (const b of birthBucket) {
+      const tribe = before.get(b.motherId) ?? 0;
+      birthsByTribe.get(tribe)?.push(b);
+    }
+    for (const d of deathBucket) {
+      const tribe = before.get(d.entityId) ?? 0;
+      deathsByTribe.get(tribe)?.push(d);
+    }
+  }
+
+  const perTribe: TribeSummary[] = villages.map(v => ({
+    tribe: v.tribe,
+    births: birthsByTribe.get(v.tribe) ?? [],
+    deaths: deathsByTribe.get(v.tribe) ?? [],
+    stockpileBefore: stockpileBeforeByTribe.get(v.tribe) ?? snapshotStockpile(v),
+    stockpileAfter: snapshotStockpile(v),
+  }));
+
+  const summary: PassiveSummary = {
+    endedAtTick: world.tick,
+    passivePhaseYears: years,
+    perTribe,
+  };
+
+  const nextWorld: WorldState = {
+    ...world,
+    entities,
+    houses,
+    villages,
+    log,
+    phase: 'summary',
+    phaseTick: 0,
+    lastPassiveSummary: summary,
+  };
+
+  return { world: nextWorld, summary };
 }

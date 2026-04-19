@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { ageAll, applyOldAgeDeaths, applyConsumption, applyStarvationDeaths, runMatingRound, resolveBirths } from '../phases';
+import { ageAll, applyOldAgeDeaths, applyConsumption, applyStarvationDeaths, runMatingRound, resolveBirths, computePassivePhase } from '../phases';
 import { TICKS_PER_YEAR } from '../types';
-import type { Entity, House, LogEntry, DeathRecord, Village, BirthRecord } from '../types';
+import type { Entity, House, LogEntry, DeathRecord, Village, BirthRecord, WorldState } from '../types';
 import { vi } from 'vitest';
 
 function makeEntity(overrides: Partial<Entity> = {}): Entity {
@@ -255,5 +255,76 @@ describe('resolveBirths', () => {
     const entities = [makeEntity({ id: 'a', gender: 'female', pregnancyTimer: 0 })];
     const result = resolveBirths(entities, [], 0, [], [], [], () => 'x');
     expect(result).toEqual(entities);
+  });
+});
+
+function makeWorld(overrides: Partial<WorldState> = {}): WorldState {
+  return {
+    entities: [],
+    animals: [],
+    trees: [],
+    goldDeposits: [],
+    houses: [],
+    biomes: [],
+    villages: [],
+    grass: [],
+    tick: 1000,
+    gridSize: 30,
+    log: [],
+    phase: 'active',
+    phaseTick: 800,
+    ...overrides,
+  };
+}
+
+describe('computePassivePhase', () => {
+  it('returns phase=summary with populated lastPassiveSummary', () => {
+    const world = makeWorld({
+      entities: [
+        makeEntity({ id: 'a', tribe: 0, age: 30 * TICKS_PER_YEAR, energy: 80 }),
+      ],
+      villages: [makeVillage({ tribe: 0, cookedMeatStore: 1000, woodStore: 1000 })],
+    });
+    const { world: next } = computePassivePhase(world, 3, () => 'baby-1');
+    expect(next.phase).toBe('summary');
+    expect(next.phaseTick).toBe(0);
+    expect(next.lastPassiveSummary).toBeDefined();
+    expect(next.lastPassiveSummary!.perTribe).toHaveLength(1);
+    expect(next.lastPassiveSummary!.passivePhaseYears).toBe(3);
+  });
+
+  it('ages entities by passivePhaseYears', () => {
+    const world = makeWorld({
+      entities: [makeEntity({ id: 'a', tribe: 0, age: 10 * TICKS_PER_YEAR })],
+      villages: [makeVillage({ tribe: 0, cookedMeatStore: 1000, woodStore: 1000 })],
+    });
+    const { world: next } = computePassivePhase(world, 3, () => 'baby-1');
+    const a = next.entities.find(e => e.id === 'a')!;
+    expect(a.age).toBe(13 * TICKS_PER_YEAR);
+  });
+
+  it('kills off entities past maxAge during skip', () => {
+    const world = makeWorld({
+      entities: [makeEntity({ id: 'old', tribe: 0, age: 48 * TICKS_PER_YEAR, maxAge: 50 * TICKS_PER_YEAR })],
+      villages: [makeVillage({ tribe: 0, cookedMeatStore: 1000, woodStore: 1000 })],
+    });
+    const { world: next, summary } = computePassivePhase(world, 3, () => 'baby-1');
+    expect(next.entities.find(e => e.id === 'old')).toBeUndefined();
+    expect(summary.perTribe[0].deaths.some(d => d.cause === 'old_age')).toBe(true);
+  });
+
+  it('stockpile snapshots capture before/after drain', () => {
+    const world = makeWorld({
+      entities: [
+        makeEntity({ id: 'a', tribe: 0, age: 30 * TICKS_PER_YEAR, energy: 80, gender: 'male' }),
+        makeEntity({ id: 'b', tribe: 0, age: 30 * TICKS_PER_YEAR, energy: 80, gender: 'male' }),
+      ],
+      villages: [makeVillage({ tribe: 0, cookedMeatStore: 100, woodStore: 100 })],
+    });
+    const { summary } = computePassivePhase(world, 3, () => 'x');
+    const t = summary.perTribe[0];
+    expect(t.stockpileBefore.cookedMeat).toBe(100);
+    expect(t.stockpileAfter.cookedMeat).toBeLessThan(100);
+    expect(t.stockpileAfter.wood).toBeLessThan(100);
   });
 });
