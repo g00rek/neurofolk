@@ -39,8 +39,8 @@ function loadMapParams(): { gridSize: number; params: BiomeGenParams } {
   return { gridSize: 30, params: { ...DEFAULT_BIOME_PARAMS } };
 }
 
-const INITIAL_ENTITY_COUNT = 4;
-const VILLAGE_COUNT = 1;
+const INITIAL_ENTITY_COUNT = 8;
+const VILLAGE_COUNT = 2;
 const INITIAL_SPEED = 300;
 const SIDEBAR_W = 300;
 
@@ -61,7 +61,7 @@ function useWindowSize() {
   return size;
 }
 
-const WORLD_STORAGE_KEY = 'neurofolk-world-v1';
+const WORLD_STORAGE_KEY = 'neurofolk-world-v2';
 const LOG_KEEP = 500;
 
 function loadSavedWorld(): WorldState | null {
