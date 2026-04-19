@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { detectInteractions, pheromoneMating, fightWinner } from '../interactions';
-import type { Entity, House, Village, LogEntry, RGB } from '../types';
-import { ECONOMY, TICKS_PER_YEAR, FIGHT_MIN_AGE } from '../types';
+import { detectInteractions, fightWinner } from '../interactions';
+import type { Entity, House, LogEntry, RGB } from '../types';
+import { TICKS_PER_YEAR, FIGHT_MIN_AGE } from '../types';
 
 const T = TICKS_PER_YEAR;
 
@@ -20,27 +20,11 @@ function makeEntity(overrides: Partial<Entity> = {}): Entity {
     energy: 80,
     traits: { strength: 50, dexterity: 50, intelligence: 50 },
     tribe: 0,
-    birthCooldown: 0,
     pregnancyTimer: 0,
     ...overrides,
   };
 }
 
-function makeVillage(overrides: Partial<Village> = {}): Village {
-  return {
-    tribe: 0,
-    color: [220, 60, 60] as RGB,
-    name: 'Red',
-    stockpile: { x: 5, y: 5 },
-    meatStore: 10,
-    plantStore: 10,
-    cookedMeatStore: 0,
-    driedFruitStore: 0,
-    woodStore: 5,
-    goldStore: 0,
-    ...overrides,
-  };
-}
 
 function makeHouse(overrides: Partial<House> = {}): House {
   return {
@@ -133,133 +117,6 @@ describe('detectInteractions', () => {
     // m1 is at home so should not fight
     expect(result[0].activity.kind).toBe('idle');
     expect(result[1].activity.kind).toBe('idle');
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// pheromoneMating
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe('pheromoneMating', () => {
-  it('male near settlement + fertile female -> pregnancy set', () => {
-    const house = makeHouse({ id: 'h1', position: { x: 4, y: 4 }, tribe: 0, occupants: ['f1'] });
-    const village = makeVillage({ tribe: 0, stockpile: { x: 5, y: 5 } });
-
-    const male = makeEntity({
-      id: 'm1', name: 'Adam', gender: 'male', tribe: 0,
-      position: { x: 5, y: 5 }, // at stockpile
-      age: 20 * T,
-      energy: 80,
-      traits: { strength: 100, dexterity: 50, intelligence: 50 }, // max strength = 50% chance
-    });
-    const female = makeEntity({
-      id: 'f1', name: 'Eve', gender: 'female', tribe: 0,
-      position: { x: 5, y: 6 }, // adjacent to male
-      age: 20 * T,
-      energy: 80,
-      homeId: 'h1',
-      birthCooldown: 0,
-      pregnancyTimer: 0,
-    });
-
-    // Force mating chance to succeed
-    vi.spyOn(Math, 'random').mockReturnValue(0.0);
-
-    const log: LogEntry[] = [];
-    const result = pheromoneMating([male, female], [village], [house], log, 100);
-
-    const updatedFemale = result.find(e => e.id === 'f1')!;
-    expect(updatedFemale.pregnancyTimer).toBe(ECONOMY.reproduction.pregnancyTicks);
-    expect(updatedFemale.fatherTraits).toEqual(male.traits);
-    expect(log.length).toBe(1);
-    expect(log[0].type).toBe('pregnant');
-  });
-
-  it('mating requires female energy >= pregnancyMinEnergy', () => {
-    const house = makeHouse({ id: 'h1', position: { x: 4, y: 4 }, tribe: 0, occupants: ['f1'] });
-    const village = makeVillage({ tribe: 0, stockpile: { x: 5, y: 5 } });
-
-    const male = makeEntity({
-      id: 'm1', gender: 'male', tribe: 0,
-      position: { x: 5, y: 5 },
-      age: 20 * T,
-      traits: { strength: 100, dexterity: 50, intelligence: 50 },
-    });
-    const female = makeEntity({
-      id: 'f1', gender: 'female', tribe: 0,
-      position: { x: 5, y: 6 },
-      age: 20 * T,
-      energy: 30, // below pregnancyMinEnergy (60)
-      homeId: 'h1',
-      birthCooldown: 0,
-      pregnancyTimer: 0,
-    });
-
-    vi.spyOn(Math, 'random').mockReturnValue(0.0);
-
-    const log: LogEntry[] = [];
-    const result = pheromoneMating([male, female], [village], [house], log, 100);
-
-    const updatedFemale = result.find(e => e.id === 'f1')!;
-    expect(updatedFemale.pregnancyTimer).toBe(0); // not pregnant
-    expect(log.length).toBe(0);
-  });
-
-  it('already pregnant female is skipped', () => {
-    const house = makeHouse({ id: 'h1', position: { x: 4, y: 4 }, tribe: 0, occupants: ['f1'] });
-    const village = makeVillage({ tribe: 0, stockpile: { x: 5, y: 5 } });
-
-    const male = makeEntity({
-      id: 'm1', gender: 'male', tribe: 0,
-      position: { x: 5, y: 5 },
-      age: 20 * T,
-      traits: { strength: 100, dexterity: 50, intelligence: 50 },
-    });
-    const female = makeEntity({
-      id: 'f1', gender: 'female', tribe: 0,
-      position: { x: 5, y: 6 },
-      age: 20 * T,
-      energy: 80,
-      homeId: 'h1',
-      pregnancyTimer: 200, // already pregnant
-    });
-
-    vi.spyOn(Math, 'random').mockReturnValue(0.0);
-
-    const log: LogEntry[] = [];
-    const result = pheromoneMating([male, female], [village], [house], log, 100);
-
-    const updatedFemale = result.find(e => e.id === 'f1')!;
-    expect(updatedFemale.pregnancyTimer).toBe(200); // unchanged
-    expect(log.length).toBe(0);
-  });
-
-  it('male far from settlement does not trigger mating', () => {
-    const house = makeHouse({ id: 'h1', position: { x: 4, y: 4 }, tribe: 0, occupants: ['f1'] });
-    const village = makeVillage({ tribe: 0, stockpile: { x: 5, y: 5 } });
-
-    const male = makeEntity({
-      id: 'm1', gender: 'male', tribe: 0,
-      position: { x: 20, y: 20 }, // far from any settlement
-      age: 20 * T,
-      traits: { strength: 100, dexterity: 50, intelligence: 50 },
-    });
-    const female = makeEntity({
-      id: 'f1', gender: 'female', tribe: 0,
-      position: { x: 20, y: 21 }, // near male but far from settlement
-      age: 20 * T,
-      energy: 80,
-      homeId: 'h1',
-    });
-
-    vi.spyOn(Math, 'random').mockReturnValue(0.0);
-
-    const log: LogEntry[] = [];
-    const result = pheromoneMating([male, female], [village], [house], log, 100);
-
-    const updatedFemale = result.find(e => e.id === 'f1')!;
-    expect(updatedFemale.pregnancyTimer).toBe(0);
-    expect(log.length).toBe(0);
   });
 });
 

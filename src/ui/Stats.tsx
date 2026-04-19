@@ -1,5 +1,5 @@
 import type { WorldState, Entity } from '../engine/types';
-import { TICKS_PER_YEAR, TICKS_PER_DAY, CHILD_AGE, ECONOMY, HOUSE_CAPACITY } from '../engine/types';
+import { TICKS_PER_YEAR, TICKS_PER_DAY, CHILD_AGE, ECONOMY, HOUSE_CAPACITY, RUNTIME_CONFIG } from '../engine/types';
 import { ageInYears } from '../engine/world';
 import {
   Axe,
@@ -110,6 +110,11 @@ export function Stats({ world }: StatsProps) {
                   <Sun size={12} />
                   Day {dayInMonth}
                 </span>
+              </div>
+              <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>
+                {world.phase === 'active'
+                  ? `Lato — ${world.phaseTick}/${RUNTIME_CONFIG.activePhaseTicks}t`
+                  : 'Długa Zima (podsumowanie)'}
               </div>
             </>
           );

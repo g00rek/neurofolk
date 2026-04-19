@@ -67,14 +67,14 @@ describe('mining flow', () => {
         meatStore: 99, plantStore: 99, cookedMeatStore: 99, driedFruitStore: 99,
         woodStore: 99, goldStore: 0,
       }],
-      grass: emptyGrass(10), log: [],
+      grass: emptyGrass(10), log: [], phase: 'active' as const, phaseTick: 0,
       goldDeposits: [{ id: 'g1', position: { x: 5, y: 5 }, remaining: 6 }],
       entities: [{
         id: 'm1', name: 'Miner', position: { x: 4, y: 5 }, gender: 'male',
         activity: { kind: 'moving', purpose: 'mine', target: { x: 5, y: 5 }, pace: 'walk', setTick: 0 },
         age: 25 * T, maxAge: 100 * T, color: [255, 0, 0],
         energy: 80, traits: { strength: 50, dexterity: 50, intelligence: 50 },
-        tribe: 0, birthCooldown: 0, pregnancyTimer: 0,
+        tribe: 0, pregnancyTimer: 0,
       }],
     };
     // Tick once: arrival (already adjacent) → startWork('mining')
@@ -104,13 +104,13 @@ describe('gold deposit', () => {
         meatStore: 99, plantStore: 99, cookedMeatStore: 99, driedFruitStore: 99,
         woodStore: 99, goldStore: 0,
       }],
-      grass: emptyGrass(10), log: [], goldDeposits: [],
+      grass: emptyGrass(10), log: [], phase: 'active' as const, phaseTick: 0, goldDeposits: [],
       entities: [{
         id: 'm1', name: 'Miner', position: { x: 2, y: 3 }, gender: 'male',
         activity: { kind: 'moving', purpose: 'deposit', target: { x: 2, y: 2 }, pace: 'walk', setTick: 0 },
         age: 25 * T, maxAge: 100 * T, color: [255, 0, 0],
         energy: 80, traits: { strength: 50, dexterity: 50, intelligence: 50 },
-        tribe: 0, birthCooldown: 0, pregnancyTimer: 0,
+        tribe: 0, pregnancyTimer: 0,
         carrying: { type: 'gold', amount: 2 },
       }],
     };
@@ -132,14 +132,14 @@ describe('gold end-to-end', () => {
         meatStore: 999, plantStore: 999, cookedMeatStore: 999, driedFruitStore: 999,
         woodStore: 999, goldStore: 0,
       }],
-      grass: emptyGrass(12), log: [],
+      grass: emptyGrass(12), log: [], phase: 'active' as const, phaseTick: 0,
       goldDeposits: [{ id: 'g1', position: { x: 6, y: 6 }, remaining: 6 }],
       entities: [{
         id: 'm1', name: 'Miner', position: { x: 2, y: 2 }, gender: 'male',
         activity: { kind: 'idle' },
         age: 25 * T, maxAge: 100 * T, color: [255, 0, 0],
         energy: 100, traits: { strength: 50, dexterity: 50, intelligence: 50 },
-        tribe: 0, birthCooldown: 0, pregnancyTimer: 0,
+        tribe: 0, pregnancyTimer: 0,
       }],
     };
     let state = world;
@@ -160,14 +160,14 @@ describe('gold depletion', () => {
         meatStore: 999, plantStore: 999, cookedMeatStore: 999, driedFruitStore: 999,
         woodStore: 999, goldStore: 0,
       }],
-      grass: emptyGrass(10), log: [],
+      grass: emptyGrass(10), log: [], phase: 'active' as const, phaseTick: 0,
       goldDeposits: [{ id: 'g1', position: { x: 5, y: 5 }, remaining: 6 }],
       entities: [{
         id: 'm1', name: 'Miner', position: { x: 1, y: 1 }, gender: 'male',
         activity: { kind: 'idle' },
         age: 25 * T, maxAge: 100 * T, color: [255, 0, 0],
         energy: 100, traits: { strength: 50, dexterity: 50, intelligence: 50 },
-        tribe: 0, birthCooldown: 0, pregnancyTimer: 0,
+        tribe: 0, pregnancyTimer: 0,
       }],
     };
     let state = world;

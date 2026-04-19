@@ -17,8 +17,9 @@ import type { BiomeGenParams } from './biomes';
 import { decideAction, buildAIContext, actionToActivity, shouldReEvaluate, precomputeContext } from './utility-ai';
 import { randomName } from './names';
 import { applyEnergyDrain, eatFromCarrying, eatFromStockpile } from './metabolism';
-import { processDeaths, processBirths } from './demography';
-import { detectInteractions, pheromoneMating, fightWinner } from './interactions';
+import { processDeaths } from './demography';
+import { detectInteractions, fightWinner } from './interactions';
+import { computePassivePhase } from './phases';
 import {
   IDLE,
   resolveHuntArrival, completeHunting,
@@ -407,7 +408,6 @@ export function createWorld(options: CreateWorldOptions): WorldState {
         energy: ECONOMY.metabolism.energyStart,
         traits,
         tribe,
-        birthCooldown: 0,
         pregnancyTimer: 0,
       });
     }
@@ -501,7 +501,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
     });
   }
 
-  return { entities, animals, trees, goldDeposits, houses: [], biomes, villages, grass, tick: 0, gridSize, log: [] };
+  return { entities, animals, trees, goldDeposits, houses: [], biomes, villages, grass, tick: 0, gridSize, log: [], phase: 'active', phaseTick: 0 };
 }
 
 // starvationContext moved to demography.ts
@@ -879,6 +879,7 @@ function moveChildren(
 // --- Main tick ---
 
 export function tick(state: WorldState): WorldState {
+  if (state.phase !== 'active') return state;
   const { gridSize } = state;
   // biomes is immutable inside tick() — share the reference, no deep-copy.
   // trees: shallow array copy (elements replaced by reference, not mutated in place).
@@ -920,8 +921,6 @@ export function tick(state: WorldState): WorldState {
     const a = {
       ...e,
       age: e.age + 1,
-      birthCooldown: Math.max(0, e.birthCooldown - 1),
-      pregnancyTimer: Math.max(0, e.pregnancyTimer - 1),
     };
     // Metabolism (see metabolism.ts for details):
     //   infants: no drain, no eating. children: 25% drain. adults: full drain.
@@ -942,11 +941,6 @@ export function tick(state: WorldState): WorldState {
   const deathResult = processDeaths(aged, houses, tickNum, state.entities, updatedVillages);
   let entities = deathResult.alive;
   log.push(...deathResult.log);
-
-  // --- Step 0c: Births — pregnancyTimer just hit 0 for these mothers — demography.ts ---
-  const birthResult = processBirths(entities, state.entities, houses, tickNum, generateId);
-  entities = birthResult.entities;
-  log.push(...birthResult.log);
 
   // --- Step 0b: Validate homeId — remove if entity not in house's occupants ---
   for (let i = 0; i < entities.length; i++) {
@@ -1175,9 +1169,6 @@ export function tick(state: WorldState): WorldState {
   trees = updateTreeSeasons(trees, currentSeason, isWinter);
   regrowGrass(grass, biomes, gridSize);
 
-  // --- Step 7: Pheromone mating (every tick) ---
-  entities = pheromoneMating(entities, updatedVillages, houses, log, tickNum);
-
   // --- Step 7b: Homeless adults claim house slots ---
   for (let i = 0; i < entities.length; i++) {
     const e = entities[i];
@@ -1193,5 +1184,36 @@ export function tick(state: WorldState): WorldState {
   entities = moveChildren(entities, updatedVillages, biomes, gridSize, blockedTiles);
 
   const fullLog = [...state.log, ...log];
-  return { entities, animals, trees, goldDeposits, houses, biomes, villages: updatedVillages, grass, tick: tickNum, gridSize, log: fullLog };
+  const nextPhaseTick = state.phaseTick + 1;
+  if (nextPhaseTick >= RUNTIME_CONFIG.activePhaseTicks) {
+    const prelim: WorldState = {
+      ...state,
+      entities,
+      animals,
+      trees,
+      goldDeposits,
+      houses,
+      villages: updatedVillages,
+      grass,
+      tick: tickNum,
+      log: fullLog,
+      phase: 'active',
+      phaseTick: nextPhaseTick,
+    };
+    const { world: withSummary } = computePassivePhase(prelim, RUNTIME_CONFIG.passivePhaseYears, () => generateId('e'));
+    return withSummary;
+  }
+  return {
+    ...state,
+    entities,
+    animals,
+    trees,
+    goldDeposits,
+    houses,
+    villages: updatedVillages,
+    grass,
+    tick: tickNum,
+    log: fullLog,
+    phaseTick: nextPhaseTick,
+  };
 }

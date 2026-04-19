@@ -15,7 +15,8 @@ type WorkerRequest =
   | { type: 'setSpeed'; speed: number }
   | { type: 'reset'; world: WorldState; speed: number }
   | { type: 'setRuntimeConfig'; config: Partial<typeof RUNTIME_CONFIG> }
-  | { type: 'skip'; ticks: number };
+  | { type: 'skip'; ticks: number }
+  | { type: 'advancePhase' };
 
 type WorkerResponse =
   | { type: 'snapshot'; world: WorldState; samples: HistoryPoint[]; running: boolean };
@@ -77,10 +78,18 @@ function runSlice() {
       running = false;
       break;
     }
-
+    if (world.phase !== 'active') {
+      running = false;
+      break;
+    }
     world = tick(world);
     if (world.tick % POP_SAMPLE_INTERVAL === 0) {
       pendingSamples.push(populationSample(world));
+    }
+    if (world.phase !== 'active') {
+      // tick triggered passive phase — pause so UI renders summary
+      running = false;
+      break;
     }
   }
 
@@ -140,16 +149,19 @@ ctx.onmessage = (event: MessageEvent<WorkerRequest>) => {
       // history chart. One snapshot at the end — no intermediate renders, no animation.
       if (!world) break;
       for (let i = 0; i < message.ticks; i++) {
-        if (world.entities.length === 0) {
-          running = false;
-          break;
-        }
+        if (world.entities.length === 0) break;
+        if (world.phase !== 'active') break;
         world = tick(world);
         if (world.tick % POP_SAMPLE_INTERVAL === 0) {
           pendingSamples.push(populationSample(world));
         }
       }
       if (world) postSnapshot(world);
+      break;
+    case 'advancePhase':
+      if (!world) break;
+      world = { ...world, phase: 'active', phaseTick: 0 };
+      postSnapshot(world);
       break;
   }
 };

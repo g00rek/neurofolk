@@ -22,7 +22,6 @@ function makeEntity(overrides: Partial<Entity> = {}): Entity {
     energy: 80,
     traits: { strength: 50, dexterity: 50, intelligence: 50 },
     tribe: 0,
-    birthCooldown: 0,
     pregnancyTimer: 0,
     ...overrides,
   };

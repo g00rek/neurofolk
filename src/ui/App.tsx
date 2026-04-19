@@ -8,8 +8,9 @@ import { EntityPanel } from './EntityPanel';
 import { TilePanel } from './TilePanel';
 import { PopGraph } from './PopGraph';
 import { EventLog } from './EventLog';
+import { SummaryModal } from './SummaryModal';
 import type { WorldState, Position } from '../engine/types';
-import { TICKS_PER_YEAR, RUNTIME_CONFIG, loadRuntimeConfig } from '../engine/types';
+import { TICKS_PER_YEAR, RUNTIME_CONFIG, loadRuntimeConfig, saveRuntimeConfig } from '../engine/types';
 
 // Load persisted RUNTIME_CONFIG before world creation (sliders set on /animals page).
 loadRuntimeConfig();
@@ -83,6 +84,21 @@ export function App() {
   const [overlayPos, setOverlayPos] = useState<{ x: number; y: number } | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const [activePhaseTicks, setActivePhaseTicks] = useState(RUNTIME_CONFIG.activePhaseTicks);
+  const [passivePhaseYears, setPassivePhaseYears] = useState(RUNTIME_CONFIG.passivePhaseYears);
+
+  const handleConfigChange = useCallback((config: { activePhaseTicks?: number; passivePhaseYears?: number }) => {
+    if (config.activePhaseTicks !== undefined) {
+      setActivePhaseTicks(config.activePhaseTicks);
+      RUNTIME_CONFIG.activePhaseTicks = config.activePhaseTicks;
+    }
+    if (config.passivePhaseYears !== undefined) {
+      setPassivePhaseYears(config.passivePhaseYears);
+      RUNTIME_CONFIG.passivePhaseYears = config.passivePhaseYears;
+    }
+    workerRef.current?.postMessage({ type: 'setRuntimeConfig', config });
+    saveRuntimeConfig();
+  }, []);
 
   const { w: winW, h: winH } = useWindowSize();
   const isDesktop = winW >= 1024;
@@ -249,6 +265,9 @@ export function App() {
           onSpeedChange={setSpeed}
           onReset={handleReset}
           onSkip={handleSkip}
+          activePhaseTicks={activePhaseTicks}
+          passivePhaseYears={passivePhaseYears}
+          onConfigChange={handleConfigChange}
         />
         {isDesktop && (
           <button
@@ -370,6 +389,13 @@ export function App() {
             {graph}
           </div>
         </div>
+        {world.phase === 'summary' && world.lastPassiveSummary && (
+          <SummaryModal
+            summary={world.lastPassiveSummary}
+            villages={world.villages}
+            onContinue={() => workerRef.current?.postMessage({ type: 'advancePhase' })}
+          />
+        )}
       </div>
     );
   }
@@ -413,6 +439,13 @@ export function App() {
       <EventLog log={world.log} />
       {graph}
       <Stats world={world} />
+      {world.phase === 'summary' && world.lastPassiveSummary && (
+        <SummaryModal
+          summary={world.lastPassiveSummary}
+          villages={world.villages}
+          onContinue={() => workerRef.current?.postMessage({ type: 'advancePhase' })}
+        />
+      )}
     </div>
   );
 }

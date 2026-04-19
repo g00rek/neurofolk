@@ -5,6 +5,9 @@ interface ControlsProps {
   onSpeedChange: (speed: number) => void;
   onReset: () => void;
   onSkip: (ticks: number) => void;
+  activePhaseTicks: number;
+  passivePhaseYears: number;
+  onConfigChange: (config: { activePhaseTicks?: number; passivePhaseYears?: number }) => void;
 }
 
 // MIN_SPEED_MS bounds the max simulation rate. Below ~30ms the worker bursts many ticks
@@ -17,7 +20,7 @@ const TICKS_PER_DAY = 20;
 const TICKS_PER_MONTH = 200;   // 10 days
 const TICKS_PER_YEAR = 2400;   // 12 months
 
-export function Controls({ running, speed, onToggle, onSpeedChange, onReset, onSkip }: ControlsProps) {
+export function Controls({ running, speed, onToggle, onSpeedChange, onReset, onSkip, activePhaseTicks, passivePhaseYears, onConfigChange }: ControlsProps) {
   const sliderValue = MAX_SPEED_MS + MIN_SPEED_MS - speed;
 
   return (
@@ -39,6 +42,26 @@ export function Controls({ running, speed, onToggle, onSpeedChange, onReset, onS
         <button onClick={() => onSkip(TICKS_PER_DAY)} style={skipStyle}>+1d</button>
         <button onClick={() => onSkip(TICKS_PER_MONTH)} style={skipStyle}>+1m</button>
         <button onClick={() => onSkip(TICKS_PER_YEAR)} style={skipStyle}>+1y</button>
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginLeft: 12, alignItems: 'center', fontSize: 11 }}>
+        <label title="Długość aktywnej fazy w tickach">
+          Lato: {activePhaseTicks}t
+          <input
+            type="range" min={200} max={2000} step={100}
+            value={activePhaseTicks}
+            onChange={e => onConfigChange({ activePhaseTicks: +e.target.value })}
+            style={{ width: 70, marginLeft: 4 }}
+          />
+        </label>
+        <label title="Ile lat ziemskich trwa Długa Zima">
+          Zima: {passivePhaseYears}r
+          <input
+            type="range" min={1} max={5} step={1}
+            value={passivePhaseYears}
+            onChange={e => onConfigChange({ passivePhaseYears: +e.target.value })}
+            style={{ width: 50, marginLeft: 4 }}
+          />
+        </label>
       </div>
     </div>
   );
