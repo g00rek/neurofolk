@@ -8,6 +8,7 @@ import { EntityPanel } from './EntityPanel';
 import { TilePanel } from './TilePanel';
 import { PopGraph } from './PopGraph';
 import { EventLog } from './EventLog';
+import { SummaryModal } from './SummaryModal';
 import type { WorldState, Position } from '../engine/types';
 import { TICKS_PER_YEAR, RUNTIME_CONFIG, loadRuntimeConfig } from '../engine/types';
 
@@ -370,6 +371,13 @@ export function App() {
             {graph}
           </div>
         </div>
+        {world.phase === 'summary' && world.lastPassiveSummary && (
+          <SummaryModal
+            summary={world.lastPassiveSummary}
+            villages={world.villages}
+            onContinue={() => workerRef.current?.postMessage({ type: 'advancePhase' })}
+          />
+        )}
       </div>
     );
   }
@@ -413,6 +421,13 @@ export function App() {
       <EventLog log={world.log} />
       {graph}
       <Stats world={world} />
+      {world.phase === 'summary' && world.lastPassiveSummary && (
+        <SummaryModal
+          summary={world.lastPassiveSummary}
+          villages={world.villages}
+          onContinue={() => workerRef.current?.postMessage({ type: 'advancePhase' })}
+        />
+      )}
     </div>
   );
 }
