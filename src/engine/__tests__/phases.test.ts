@@ -327,4 +327,20 @@ describe('computePassivePhase', () => {
     expect(t.stockpileAfter.cookedMeat).toBeLessThan(100);
     expect(t.stockpileAfter.wood).toBeLessThan(100);
   });
+
+  it('does not mutate input world (entities/houses/villages)', () => {
+    const origEntity = makeEntity({ id: 'a', tribe: 0, age: 30 * TICKS_PER_YEAR, energy: 80 });
+    const origVillage = makeVillage({ tribe: 0, cookedMeatStore: 500, woodStore: 500 });
+    const origHouse: House = { id: 'h1', position: { x: 4, y: 4 }, tribe: 0, occupants: ['a'] };
+    const world = makeWorld({
+      entities: [origEntity],
+      villages: [origVillage],
+      houses: [origHouse],
+    });
+    computePassivePhase(world, 3, () => 'x');
+    expect(world.entities[0].age).toBe(30 * TICKS_PER_YEAR);
+    expect(world.villages[0].cookedMeatStore).toBe(500);
+    expect(world.villages[0].woodStore).toBe(500);
+    expect(world.houses[0].occupants).toEqual(['a']);
+  });
 });

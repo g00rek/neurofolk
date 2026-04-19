@@ -341,7 +341,11 @@ export function computePassivePhase(
 ): { world: WorldState; summary: PassiveSummary } {
   // Clone arrays we'll mutate.
   const houses = world.houses.map(h => ({ ...h, occupants: [...h.occupants] }));
-  const villages = world.villages.map(v => ({ ...v }));
+  const villages = world.villages.map(v => ({
+    ...v,
+    color: [...v.color] as RGB,
+    stockpile: v.stockpile ? { ...v.stockpile } : undefined,
+  }));
   const log: LogEntry[] = [...world.log];
 
   const stockpileBeforeByTribe = new Map<TribeId, Stockpile>();
@@ -360,10 +364,11 @@ export function computePassivePhase(
 
   // 2. Old-age deaths, tracked per-tribe.
   {
+    const tribeById = new Map(entities.map(e => [e.id, e.tribe]));
     const deathsBucket: DeathRecord[] = [];
     entities = applyOldAgeDeaths(entities, houses, world.tick, log, deathsBucket);
     for (const d of deathsBucket) {
-      const tribe = world.entities.find(e => e.id === d.entityId)?.tribe ?? 0;
+      const tribe = tribeById.get(d.entityId) ?? 0;
       deathsByTribe.get(tribe)?.push(d);
     }
   }
