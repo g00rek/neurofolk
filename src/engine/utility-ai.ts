@@ -335,7 +335,7 @@ function scoreGather(ctx: AIContext): number {
   if (!ctx.village) return 0;
   if (ctx.entity.carrying && ctx.entity.carrying.amount > 0) return 0;
 
-  if (ctx.entity.pregnancyTimer > 0 && ctx.entity.pregnancyTimer < 100) return 0;
+  if (ctx.entity.pregnancyTimer > 0) return 0;
   if (!ctx.nearestFruitTree) return 0; // no fruit in sight — don't waste a turn wandering
 
   return foodWorkUrgency(ctx.daysOfFood);

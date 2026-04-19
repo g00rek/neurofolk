@@ -307,8 +307,6 @@ export interface BirthRecord {
   babyGender: Gender;
   motherId: string;
   motherName: string;
-  fatherId?: string;
-  fatherName?: string;
 }
 
 export interface DeathRecord {
@@ -334,7 +332,7 @@ export interface PassiveSummary {
   perTribe: TribeSummary[];
 }
 
-export type Phase = 'active' | 'passive' | 'summary';
+export type Phase = 'active' | 'summary';
 
 export const FOREST_SPEED_PENALTY = 1; // reduce steps by this in forest
 

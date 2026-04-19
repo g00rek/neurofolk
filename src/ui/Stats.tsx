@@ -114,9 +114,7 @@ export function Stats({ world }: StatsProps) {
               <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>
                 {world.phase === 'active'
                   ? `Lato — ${world.phaseTick}/${RUNTIME_CONFIG.activePhaseTicks}t`
-                  : world.phase === 'summary'
-                    ? 'Długa Zima (podsumowanie)'
-                    : 'Długa Zima'}
+                  : 'Długa Zima (podsumowanie)'}
               </div>
             </>
           );

@@ -23,7 +23,7 @@ describe('simulation smoke tests', () => {
       world = tick(world);
       // After a passive-phase summary the world pauses at phase='summary'.
       // Resume (simulating what the worker does) so the tick loop can continue.
-      if (world.phase !== 'active') {
+      if (world.phase === 'summary') {
         world = { ...world, phase: 'active', phaseTick: 0 };
         // Re-stock so subsequent passive phases also have adequate food/wood.
         world = topUpStockpiles(world);
@@ -44,7 +44,7 @@ describe('simulation smoke tests', () => {
       world = tick(world);
       // After a passive-phase summary the world pauses at phase='summary'.
       // Resume (simulating what the worker does) so the tick loop can continue.
-      if (world.phase !== 'active') {
+      if (world.phase === 'summary') {
         world = { ...world, phase: 'active', phaseTick: 0 };
         // Re-stock so subsequent passive phases also have adequate food/wood.
         world = topUpStockpiles(world);

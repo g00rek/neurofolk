@@ -59,9 +59,13 @@ export interface ConsumptionResult {
 }
 
 /**
+ * @internal — exported for unit tests only; callers should use computePassivePhase.
+ *
  * Drain food (cooked first, then dried, raw meat, raw plant) and wood from village.
- * **MUTATES village in place** — updates cookedMeatStore, driedFruitStore,
- * meatStore, plantStore, woodStore.
+ *
+ * **⚠️ MUTATES the `v` argument in place** — updates cookedMeatStore, driedFruitStore,
+ * meatStore, plantStore, woodStore. Callers must clone the village if they want to preserve
+ * the original. (computePassivePhase passes a cloned village.)
  *
  * Returns deficit expressed as "how many people cannot be supported".
  *
