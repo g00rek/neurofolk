@@ -122,11 +122,12 @@ function drawHouseSprite(
   tribe: number,
   frameIdx: number,
 ) {
-  // Roof Y by tribe: 0=red(96), 2=green(56)
-  const roofSy = tribe === 2 ? 56 : 96;
+  // Roof Y by tribe: 0=red(96), 1=green(56). Blue tribe (2) has no sprite — falls
+  // back to red for now.
+  const roofSy = tribe === 1 ? 56 : 96;
   const roofVariants = [40, 104, 168];
   const roofSx = roofVariants[Math.floor(((x * 7 + y * 13) & 0x7fffffff) % 3)];
-  const chimneySy = tribe === 2 ? 192 : 208;
+  const chimneySy = tribe === 1 ? 192 : 208;
   const chimSx = 88 + (frameIdx % 6) * 8;
 
   // Draw 3×3 tile pattern (24×24 source) into 2×2 cell area

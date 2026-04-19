@@ -301,8 +301,10 @@ export function createWorld(options: CreateWorldOptions): WorldState {
   const biomes = generateBiomeGrid(gridSize, options.biomeParams);
 
   // Tribe definitions (up to 3)
-  const allTribeColors: RGB[] = [[220, 60, 60], [60, 100, 220], [60, 180, 60]];
-  const allTribeNames = ['Red Tribe', 'Blue Tribe', 'Green Tribe'];
+  // Ordered so the first two have matching roof sprites (red & green). Blue has no
+  // roof sprite yet, so it's only used when all three tribes are in play.
+  const allTribeColors: RGB[] = [[220, 60, 60], [60, 180, 60], [60, 100, 220]];
+  const allTribeNames = ['Red Tribe', 'Green Tribe', 'Blue Tribe'];
   // Find village start positions on plains, spread apart
   const startPositions: Position[] = [];
   const minDist = Math.floor(gridSize * 0.3);
