@@ -161,7 +161,11 @@ ctx.onmessage = (event: MessageEvent<WorkerRequest>) => {
     case 'advancePhase':
       if (!world) break;
       world = { ...world, phase: 'active', phaseTick: 0 };
+      // Auto-resume simulation: winter was a pause, now keep playing without
+      // requiring another 'start' message from the UI (which would race the snapshot).
+      running = true;
       postSnapshot(world);
+      schedule();
       break;
   }
 };

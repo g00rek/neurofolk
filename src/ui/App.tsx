@@ -154,7 +154,7 @@ export function App() {
       if (event.data.type !== 'snapshot') return;
       setWorld(event.data.world);
       saveWorld(event.data.world);
-      if (!event.data.running) setRunning(false);
+      setRunning(event.data.running);
       if (event.data.samples.length > 0) {
         setHistory(h => {
           const updated = [...h, ...event.data.samples];
@@ -269,8 +269,9 @@ export function App() {
   }, [world]);
 
   const handleAdvancePhase = useCallback(() => {
+    // Worker's advancePhase handler flips running=true and schedules itself — the
+    // snapshot that comes back will carry running=true and React state will sync.
     workerRef.current?.postMessage({ type: 'advancePhase' });
-    setRunning(true); // auto-resume play after the Long Winter summary
   }, []);
 
   const handleReset = useCallback(() => {
