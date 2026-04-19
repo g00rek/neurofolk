@@ -2,10 +2,10 @@ import { createWorld, tick } from './world';
 import { RUNTIME_CONFIG } from './types';
 import type { Entity, WorldState } from './types';
 
-const RUNS = 3;
-const MAX_TICKS = 8000;
-const GRID = 25;
-const ENTITIES = 6;
+const RUNS = 2;
+const MAX_TICKS = 5000;
+const GRID = 30;
+const ENTITIES = 4;
 const VILLAGES = 1;
 
 function activityLabel(e: Entity): string {
@@ -58,13 +58,18 @@ for (let r = 0; r < RUNS; r++) {
     // When a passive summary just fired, dump it and advance past it.
     if (world.phase === 'summary' && world.lastPassiveSummary) {
       const s = world.lastPassiveSummary;
+      const popNow = world.entities.length;  // already post-consumption (if people died) + post-births
       for (const ts of s.perTribe) {
         const ago = `${ts.stockpileBefore.cookedMeat}c+${ts.stockpileBefore.meat}m+${ts.stockpileBefore.wood}w`;
         const aft = `${ts.stockpileAfter.cookedMeat}c+${ts.stockpileAfter.meat}m+${ts.stockpileAfter.wood}w`;
+        const cookedUsed = ts.stockpileBefore.cookedMeat - ts.stockpileAfter.cookedMeat;
+        const rawUsed = ts.stockpileBefore.meat - ts.stockpileAfter.meat;
+        const woodUsed = ts.stockpileBefore.wood - ts.stockpileAfter.wood;
+        const energyUsed = cookedUsed * 50 + rawUsed * 25;
         const causes: Record<string, number> = {};
         for (const d of ts.deaths) causes[d.cause] = (causes[d.cause] ?? 0) + 1;
         const causeStr = Object.entries(causes).map(([k, n]) => `${k}:${n}`).join(' ');
-        console.log(`  [WINTER tribe=${ts.tribe}] births=${ts.births.length} deaths=${ts.deaths.length} (${causeStr}) stock ${ago} → ${aft}`);
+        console.log(`  [WINTER tribe=${ts.tribe}] pop(post)=${popNow} used=${cookedUsed}c+${rawUsed}m(${energyUsed}E)+${woodUsed}w births=${ts.births.length} deaths=${ts.deaths.length} (${causeStr}) ${ago} → ${aft}`);
       }
       // Advance phase (simulating UI click).
       world = { ...world, phase: 'active', phaseTick: 0 };

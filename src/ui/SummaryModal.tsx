@@ -32,7 +32,8 @@ export function SummaryModal({ summary, villages, onContinue }: Props) {
                 <div style={{ fontSize: 12, color: '#bbb', marginTop: 4 }}>
                   {causeCount(t.deaths, 'old_age')} starość,{' '}
                   {causeCount(t.deaths, 'starvation')} głód,{' '}
-                  {causeCount(t.deaths, 'childbirth')} poród
+                  {causeCount(t.deaths, 'childbirth')} poród,{' '}
+                  {causeCount(t.deaths, 'infant')} martwy noworodek
                 </div>
               )}
               <div style={stockpileRowStyle}>

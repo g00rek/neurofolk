@@ -102,8 +102,11 @@ export function applyConsumption(
   const perPersonYearFood = years * ECONOMY.winter.foodEnergyPerPersonPerYear;
   const perPersonYearWood = years * ECONOMY.winter.woodPerPersonPerYear;
 
-  const foodDeficitPeople = foodNeeded > 0 ? Math.ceil(foodNeeded / perPersonYearFood) : 0;
-  const woodDeficitPeople = woodNeeded > 0 ? Math.ceil(woodNeeded / perPersonYearWood) : 0;
+  // Tolerance: forgive up to max(2, 10% of population) person-deficit. Small shortfalls
+  // are absorbed (everyone tightens belts, shares wood). Only real scarcity kills.
+  const tolerance = Math.max(2, Math.floor(population * 0.1));
+  const foodDeficitPeople = foodNeeded > 0 ? Math.max(0, Math.floor(foodNeeded / perPersonYearFood) - tolerance) : 0;
+  const woodDeficitPeople = woodNeeded > 0 ? Math.max(0, Math.floor(woodNeeded / perPersonYearWood) - tolerance) : 0;
 
   return { foodDeficitPeople, woodDeficitPeople };
 }
@@ -268,11 +271,11 @@ export function resolveBirths(
       log.push({
         tick: tickNum, type: 'death',
         entityId: babyId, name: babyName, gender: babyGender, age: 0,
-        cause: 'starvation', detail: 'infant mortality',
+        cause: 'infant', detail: 'stillbirth',
       });
       deaths.push({
         entityId: babyId, name: babyName, gender: babyGender, ageYears: 0,
-        cause: 'starvation', detail: 'infant mortality',
+        cause: 'infant', detail: 'stillbirth',
       });
     } else {
       const baby: Entity = {

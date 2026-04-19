@@ -276,7 +276,7 @@ export interface BiomeGrid {
   gridSize: number;
 }
 
-export type DeathCause = 'old_age' | 'starvation' | 'fight' | 'childbirth';
+export type DeathCause = 'old_age' | 'starvation' | 'fight' | 'childbirth' | 'infant';
 
 export type LogEventType =
   | 'birth' | 'death' | 'pregnant'
