@@ -1198,6 +1198,7 @@ export function tick(state: WorldState): WorldState {
       grass,
       tick: tickNum,
       log: fullLog,
+      phase: 'active',
       phaseTick: nextPhaseTick,
     };
     const { world: withSummary } = computePassivePhase(prelim, RUNTIME_CONFIG.passivePhaseYears, () => generateId('e'));
