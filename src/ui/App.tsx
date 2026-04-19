@@ -61,17 +61,51 @@ function useWindowSize() {
   return size;
 }
 
+const WORLD_STORAGE_KEY = 'neurofolk-world-v1';
+const LOG_KEEP = 500;
+
+function loadSavedWorld(): WorldState | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(WORLD_STORAGE_KEY);
+    if (!raw) return null;
+    const w = JSON.parse(raw) as WorldState;
+    if (!w.entities || !w.villages || !w.biomes) return null;
+    return w;
+  } catch {
+    return null;
+  }
+}
+
+function saveWorld(world: WorldState): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const trimmed: WorldState = {
+      ...world,
+      log: world.log.length > LOG_KEEP ? world.log.slice(-LOG_KEEP) : world.log,
+    };
+    localStorage.setItem(WORLD_STORAGE_KEY, JSON.stringify(trimmed));
+  } catch {
+    /* quota or serialization error — silent */
+  }
+}
+
 export function App() {
   const initialWorldRef = useRef<WorldState | null>(null);
   const workerRef = useRef<Worker | null>(null);
   if (!initialWorldRef.current) {
-    const mapSettings = loadMapParams();
-    initialWorldRef.current = createWorld({
-      gridSize: mapSettings.gridSize,
-      entityCount: INITIAL_ENTITY_COUNT,
-      villageCount: VILLAGE_COUNT,
-      biomeParams: mapSettings.params,
-    });
+    const saved = loadSavedWorld();
+    if (saved) {
+      initialWorldRef.current = saved;
+    } else {
+      const mapSettings = loadMapParams();
+      initialWorldRef.current = createWorld({
+        gridSize: mapSettings.gridSize,
+        entityCount: INITIAL_ENTITY_COUNT,
+        villageCount: VILLAGE_COUNT,
+        biomeParams: mapSettings.params,
+      });
+    }
   }
 
   const [world, setWorld] = useState<WorldState>(() => initialWorldRef.current as WorldState);
@@ -119,6 +153,7 @@ export function App() {
     worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       if (event.data.type !== 'snapshot') return;
       setWorld(event.data.world);
+      saveWorld(event.data.world);
       if (!event.data.running) setRunning(false);
       if (event.data.samples.length > 0) {
         setHistory(h => {
@@ -241,6 +276,7 @@ export function App() {
       villageCount: VILLAGE_COUNT,
       biomeParams: mapSettings.params,
     });
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(WORLD_STORAGE_KEY);
     setWorld(nextWorld);
     setRunning(false);
     setSelectedId(null);
