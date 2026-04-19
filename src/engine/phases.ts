@@ -56,6 +56,9 @@ export interface ConsumptionResult {
 
 /**
  * Drain food (cooked first, then dried, raw meat, raw plant) and wood from village.
+ * **MUTATES village in place** — updates cookedMeatStore, driedFruitStore,
+ * meatStore, plantStore, woodStore.
+ *
  * Returns deficit expressed as "how many people cannot be supported".
  *
  * foodDeficitPeople = ceil(remaining_energy_shortfall / (years * foodEnergyPerPersonPerYear))
@@ -70,7 +73,7 @@ export function applyConsumption(
   let woodNeeded = population * years * ECONOMY.winter.woodPerPersonPerYear;
 
   // Drain food in priority order: cooked > dried > raw meat > raw plant.
-  const drain = (store: number, energyPerUnit: number): [taken: number, remaining: number] => {
+  const drain = (store: number, energyPerUnit: number): [number, number] => {
     if (foodNeeded <= 0 || store <= 0) return [0, store];
     const unitsNeeded = Math.ceil(foodNeeded / energyPerUnit);
     const taken = Math.min(store, unitsNeeded);
@@ -78,12 +81,10 @@ export function applyConsumption(
     return [taken, store - taken];
   };
 
-  let taken: number;
-  [taken, v.cookedMeatStore] = drain(v.cookedMeatStore, ECONOMY.cooking.cookedMeatEnergyPerUnit);
-  [taken, v.driedFruitStore] = drain(v.driedFruitStore, ECONOMY.cooking.driedFruitEnergyPerUnit);
-  [taken, v.meatStore]       = drain(v.meatStore,       ECONOMY.meat.energyPerUnit);
-  [taken, v.plantStore]      = drain(v.plantStore,      ECONOMY.fruit.energyPerUnit);
-  void taken;
+  [, v.cookedMeatStore] = drain(v.cookedMeatStore, ECONOMY.cooking.cookedMeatEnergyPerUnit);
+  [, v.driedFruitStore] = drain(v.driedFruitStore, ECONOMY.cooking.driedFruitEnergyPerUnit);
+  [, v.meatStore]       = drain(v.meatStore,       ECONOMY.meat.energyPerUnit);
+  [, v.plantStore]      = drain(v.plantStore,      ECONOMY.fruit.energyPerUnit);
 
   // Wood drain.
   const woodTaken = Math.min(v.woodStore, woodNeeded);

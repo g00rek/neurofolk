@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ageAll, applyOldAgeDeaths, applyConsumption } from '../phases';
-import { TICKS_PER_YEAR, ECONOMY } from '../types';
+import { TICKS_PER_YEAR } from '../types';
 import type { Entity, House, LogEntry, DeathRecord, Village } from '../types';
 
 function makeEntity(overrides: Partial<Entity> = {}): Entity {
