@@ -5,7 +5,11 @@ import { TICKS_PER_YEAR } from '../types';
 describe('simulation smoke tests', () => {
   it('runs 1 year (2400 ticks) without crashing', () => {
     let world = createWorld({ gridSize: 30, entityCount: 6, villageCount: 1 });
-    for (let i = 0; i < TICKS_PER_YEAR; i++) world = tick(world);
+    for (let i = 0; i < TICKS_PER_YEAR; i++) {
+      // Reset phase to 'active' after passive/summary transitions so tick counter advances.
+      if (world.phase !== 'active') world = { ...world, phase: 'active', phaseTick: 0 };
+      world = tick(world);
+    }
     expect(world.tick).toBe(TICKS_PER_YEAR);
     expect(world.entities.length).toBeGreaterThan(0);
   });
@@ -13,7 +17,11 @@ describe('simulation smoke tests', () => {
   it('runs 5 years without crash — population survives', () => {
     let world = createWorld({ gridSize: 30, entityCount: 6, villageCount: 1 });
     const ticks = TICKS_PER_YEAR * 5;
-    for (let i = 0; i < ticks; i++) world = tick(world);
+    for (let i = 0; i < ticks; i++) {
+      // Reset phase to 'active' after passive/summary transitions so tick counter advances.
+      if (world.phase !== 'active') world = { ...world, phase: 'active', phaseTick: 0 };
+      world = tick(world);
+    }
     expect(world.tick).toBe(ticks);
     expect(world.entities.length).toBeGreaterThanOrEqual(1);
   }, 30_000);
