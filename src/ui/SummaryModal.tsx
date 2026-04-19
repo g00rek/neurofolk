@@ -10,13 +10,13 @@ export function SummaryModal({ summary, villages, onContinue }: Props) {
   return (
     <div style={overlayStyle}>
       <div style={modalStyle}>
-        <h2 style={{ margin: 0 }}>Długa Zima minęła</h2>
+        <h2 style={{ margin: 0 }}>The Long Winter has passed</h2>
         <p style={{ color: '#aaa', marginTop: 4 }}>
-          Lat ziemskich: {summary.passivePhaseYears}
+          Earth-years elapsed: {summary.passivePhaseYears}
         </p>
         {summary.perTribe.map(t => {
           const v = villages.find(vv => vv.tribe === t.tribe);
-          const name = v?.name ?? `Plemię ${t.tribe}`;
+          const name = v?.name ?? `Tribe ${t.tribe}`;
           const color = v?.color;
           return (
             <div key={t.tribe} style={tribeBlockStyle}>
@@ -25,25 +25,25 @@ export function SummaryModal({ summary, villages, onContinue }: Props) {
                 margin: 0,
               }}>{name}</h3>
               <div style={statsRowStyle}>
-                <span>Narodzeni: <b>{t.births.length}</b></span>
-                <span>Zmarli: <b>{t.deaths.length}</b></span>
+                <span>Born: <b>{t.births.length}</b></span>
+                <span>Died: <b>{t.deaths.length}</b></span>
               </div>
               {t.deaths.length > 0 && (
                 <div style={{ fontSize: 12, color: '#bbb', marginTop: 4 }}>
-                  {causeCount(t.deaths, 'old_age')} starość,{' '}
-                  {causeCount(t.deaths, 'starvation')} głód,{' '}
-                  {causeCount(t.deaths, 'childbirth')} poród,{' '}
-                  {causeCount(t.deaths, 'infant')} martwy noworodek
+                  {causeCount(t.deaths, 'old_age')} old age,{' '}
+                  {causeCount(t.deaths, 'starvation')} starvation,{' '}
+                  {causeCount(t.deaths, 'childbirth')} childbirth,{' '}
+                  {causeCount(t.deaths, 'infant')} stillborn
                 </div>
               )}
               <div style={stockpileRowStyle}>
-                <span>Jedzenie (cooked): {t.stockpileBefore.cookedMeat} → {t.stockpileAfter.cookedMeat}</span>
-                <span>Drewno: {t.stockpileBefore.wood} → {t.stockpileAfter.wood}</span>
+                <span>Food (cooked): {t.stockpileBefore.cookedMeat} → {t.stockpileAfter.cookedMeat}</span>
+                <span>Wood: {t.stockpileBefore.wood} → {t.stockpileAfter.wood}</span>
               </div>
             </div>
           );
         })}
-        <button onClick={onContinue} style={buttonStyle}>Rozpocznij nowe Lato</button>
+        <button onClick={onContinue} style={buttonStyle}>Begin next Summer</button>
       </div>
     </div>
   );

@@ -102,7 +102,7 @@ export function Stats({ world }: StatsProps) {
               <div style={{ fontSize: '13px', color: world.phase === 'active' ? '#e0af68' : '#7aa2f7', marginTop: '2px' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   <Sun size={12} />
-                  {world.phase === 'active' ? `Lato — Day ${activeDay}/${activeDays}` : 'Długa Zima'}
+                  {world.phase === 'active' ? `Summer — Day ${activeDay}/${activeDays}` : 'Long Winter'}
                 </span>
               </div>
             </>

@@ -44,8 +44,8 @@ export function Controls({ running, speed, onToggle, onSpeedChange, onReset, onS
         <button onClick={() => onSkip(TICKS_PER_YEAR)} style={skipStyle}>+1y</button>
       </div>
       <div style={{ display: 'flex', gap: 8, marginLeft: 12, alignItems: 'center', fontSize: 11 }}>
-        <label title="Długość aktywnej fazy w tickach">
-          Lato: {activePhaseTicks}t
+        <label title="Active phase length in ticks">
+          Summer: {activePhaseTicks}t
           <input
             type="range" min={200} max={2000} step={100}
             value={activePhaseTicks}
@@ -53,8 +53,8 @@ export function Controls({ running, speed, onToggle, onSpeedChange, onReset, onS
             style={{ width: 70, marginLeft: 4 }}
           />
         </label>
-        <label title="Ile lat ziemskich trwa Długa Zima">
-          Zima: {passivePhaseYears}r
+        <label title="Earth-years the Long Winter lasts">
+          Winter: {passivePhaseYears}y
           <input
             type="range" min={1} max={5} step={1}
             value={passivePhaseYears}
