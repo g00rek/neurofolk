@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { ageAll, applyOldAgeDeaths } from '../phases';
-import { TICKS_PER_YEAR } from '../types';
-import type { Entity, House, LogEntry, DeathRecord } from '../types';
+import { ageAll, applyOldAgeDeaths, applyConsumption } from '../phases';
+import { TICKS_PER_YEAR, ECONOMY } from '../types';
+import type { Entity, House, LogEntry, DeathRecord, Village } from '../types';
 
 function makeEntity(overrides: Partial<Entity> = {}): Entity {
   return {
@@ -60,5 +60,49 @@ describe('ageAll', () => {
     const entities = [makeEntity({ id: 'a', age: 5 * TICKS_PER_YEAR })];
     ageAll(entities, 3);
     expect(entities[0].age).toBe(5 * TICKS_PER_YEAR);
+  });
+});
+
+function makeVillage(overrides: Partial<Village> = {}): Village {
+  return {
+    tribe: 0, color: [200, 60, 60], name: 'Red',
+    meatStore: 0, plantStore: 0,
+    cookedMeatStore: 0, driedFruitStore: 0,
+    woodStore: 0, goldStore: 0,
+    ...overrides,
+  };
+}
+
+describe('applyConsumption', () => {
+  it('drains enough stockpile for 5 people × 3 years without deficit', () => {
+    const v = makeVillage({ cookedMeatStore: 1000, woodStore: 1000 });
+    const { foodDeficitPeople, woodDeficitPeople } = applyConsumption(v, 5, 3);
+    expect(foodDeficitPeople).toBe(0);
+    expect(woodDeficitPeople).toBe(0);
+    // Drained: 5 × 3 × 200 = 3000 energy. cookedMeat = 50/unit → 60 units drained.
+    expect(v.cookedMeatStore).toBe(940);
+    // Drained: 5 × 3 × 2 = 30 wood.
+    expect(v.woodStore).toBe(970);
+  });
+
+  it('reports deficit when food insufficient', () => {
+    // Required: 5 × 3 × 200 = 3000 energy. Provide 3 cooked meat = 150 energy. Deficit: 2850 energy.
+    // Deficit per person per year = 200. Deficit people = ceil(2850 / (3 × 200)) = ceil(4.75) = 5.
+    const v = makeVillage({ cookedMeatStore: 3, woodStore: 1000 });
+    const { foodDeficitPeople } = applyConsumption(v, 5, 3);
+    expect(v.cookedMeatStore).toBe(0);
+    expect(foodDeficitPeople).toBeGreaterThan(0);
+    expect(foodDeficitPeople).toBeLessThanOrEqual(5);
+  });
+
+  it('priority: cooked > dried > raw meat > raw plant', () => {
+    // Each cooked meat = 50 energy. Need 1 unit for 1 person × 1 year (need 200 energy).
+    // Provide 2 cooked + 10 dried: cooked drained first.
+    const v = makeVillage({ cookedMeatStore: 2, driedFruitStore: 10, woodStore: 100 });
+    applyConsumption(v, 1, 1);
+    // Need 200 energy. 2 cooked = 100 energy. 10 dried × 35 = 350 but only 100 more needed → ~3 dried.
+    expect(v.cookedMeatStore).toBe(0);
+    expect(v.driedFruitStore).toBeLessThan(10);
+    expect(v.driedFruitStore).toBeGreaterThanOrEqual(7);
   });
 });
