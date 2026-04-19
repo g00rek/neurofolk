@@ -82,8 +82,8 @@ describe('applyConsumption', () => {
     expect(woodDeficitPeople).toBe(0);
     // Drained: 5 × 3 × 200 = 3000 energy. cookedMeat = 50/unit → 60 units drained.
     expect(v.cookedMeatStore).toBe(940);
-    // Drained: 5 × 3 × 2 = 30 wood.
-    expect(v.woodStore).toBe(970);
+    // Drained: 5 × 3 × 1 = 15 wood.
+    expect(v.woodStore).toBe(985);
   });
 
   it('reports deficit when food insufficient', () => {

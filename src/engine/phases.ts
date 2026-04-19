@@ -376,15 +376,18 @@ export function computePassivePhase(
     }
   }
 
-  // 3 + 4. Consumption + starvation per tribe.
+  // 3 + 4. Consumption + starvation per tribe. A bad winter kills at most 30% of the
+  // tribe — the rest get by weakened rather than triggering a total cascade.
+  const WINTER_DEATH_CAP = 0.3;
   for (const v of villages) {
     const pop = entities.filter(e => e.tribe === v.tribe).length;
     if (pop === 0) continue;
     const { foodDeficitPeople, woodDeficitPeople } = applyConsumption(v, pop, years);
-    const deficit = Math.max(foodDeficitPeople, woodDeficitPeople);
-    if (deficit > 0) {
+    const rawDeficit = Math.max(foodDeficitPeople, woodDeficitPeople);
+    const cappedDeficit = Math.min(rawDeficit, Math.floor(pop * WINTER_DEATH_CAP));
+    if (cappedDeficit > 0) {
       const deathsBucket: DeathRecord[] = [];
-      entities = applyStarvationDeaths(entities, v.tribe, deficit, houses, world.tick, log, deathsBucket);
+      entities = applyStarvationDeaths(entities, v.tribe, cappedDeficit, houses, world.tick, log, deathsBucket);
       for (const d of deathsBucket) deathsByTribe.get(v.tribe)?.push(d);
     }
   }

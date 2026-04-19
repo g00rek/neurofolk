@@ -86,9 +86,10 @@ export const ECONOMY = {
   },
   // --- WOOD (from chopping trees) ---
   wood: {
-    unitsPerChop: 3,         // portions carried home from 1 tree
-    houseCost: 6,            // wood units needed to build a house (= 2 chops)
-    // 1 chop = 3 wood. 1 house = 2 chops. Lowered from 15 — housing was bottleneck (men too busy hunting).
+    unitsPerChop: 5,         // portions carried home from 1 tree
+    houseCost: 6,            // wood units needed to build a house (= 2 chops rounded up)
+    // 1 chop = 5 wood. Bumped from 3 — men are the only choppers and also hunt/mine/build,
+    // so each trip to forest must be efficient to sustain a growing tribe against winter fuel drain.
   },
   // --- METABOLISM (energy drain & hunger) ---
   metabolism: {
@@ -120,11 +121,12 @@ export const ECONOMY = {
     spawnBase: 3,            // base deposit count on 30×30 (scaled by map area)
   },
   // --- WINTER (passive phase consumption) ---
-  // Per-person-per-passive-year drain. Calibrated so that a tribe of 10 adults
-  // with 3-year skip needs ~6000 energy of food + 60 wood to survive.
+  // Per-person-per-passive-year drain. With 10-adult tribe + 3-year skip: needs
+  // ~6000 energy of food + 30 wood. Wood kept low because only men chop and the
+  // forest regrows on a ~year scale.
   winter: {
     foodEnergyPerPersonPerYear: 200,
-    woodPerPersonPerYear: 2,
+    woodPerPersonPerYear: 1,
   },
   // --- REPRODUCTION (pregnancy, mortality) ---
   // TICKS_PER_YEAR = 2400. Theoretical max per woman (12-40 age = 28 years): many pregnancies.
@@ -132,7 +134,7 @@ export const ECONOMY = {
   reproduction: {
     pregnancyTicks: 400,           // ~20 days game-time (reduced from 600 to accelerate reproduction)
     infantMortality: 0.3,          // 30% chance baby dies at birth (historical pre-industrial rate)
-    maternalMortality: 0.05,       // 5% chance mother dies per birth
+    maternalMortality: 0.025,      // 2.5% chance mother dies per birth (realistic pre-industrial)
     pregnancyMinEnergy: 60,        // woman must be well-fed (energy > this) to conceive
     infantAgeYears: 1,             // age < this = infant (breastfed, no drain, no eat)
     childDrainMultiplier: 0.25,    // age infantAge..CHILD_AGE: partial metabolism (25% — small bodies)

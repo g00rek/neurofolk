@@ -288,19 +288,37 @@ function scoreBuildHome(ctx: AIContext): number {
   return 1.0; // top-tier priority — shelter prevents homeless-baby deaths
 }
 
-// Wood is needed ONLY for building houses (no firewood, no winter heating).
-// Chop only when village needs houses AND lacks the wood to build one.
+// Wood serves two needs: house construction + Long Winter heating fuel.
+// Target = winter reserve (pop × years × woodPerPersonPerYear) + one house's worth if
+// the village needs another. Urgent until winter is covered; then topping up.
+// Subordinated to food urgency — a hungry man hunts first, chops second.
 function scoreChopWood(ctx: AIContext): number {
   if (ageInYears(ctx.entity) < CHILD_AGE) return 0;
   if (!ctx.village) return 0;
-  // Hands full — must deposit before chopping more
   if (ctx.entity.carrying && ctx.entity.carrying.amount > 0) return 0;
-  if (!ctx.villageNeedsHouses) return 0;
-  const woodTarget = ECONOMY.wood.houseCost * 2; // enough for current build + next
+
+  const winterWood = ctx.tribePopulation * RUNTIME_CONFIG.passivePhaseYears * ECONOMY.winter.woodPerPersonPerYear;
+  const houseReserve = ctx.villageNeedsHouses ? ECONOMY.wood.houseCost : 0;
+  // +50% buffer: winter consumption fluctuates with pop growth; a buffer prevents tight
+  // cycles where wood barely covers need and next cycle starts with near-zero reserve.
+  const woodTarget = Math.ceil(winterWood * 1.5) + houseReserve;
+
   if (ctx.village.woodStore >= woodTarget) return 0;
-  if (ctx.village.woodStore < ECONOMY.wood.houseCost) return 1.0; // urgent — can't build yet
-  const woodNeed = (woodTarget - ctx.village.woodStore) / woodTarget;
-  return woodNeed * 0.95;
+
+  // Food takes precedence over wood: if the tribe is hungry (urgency >= 0.7),
+  // wood drops below hunt/gather so men replenish food first.
+  const foodUrgency = foodWorkUrgency(ctx.daysOfFood);
+
+  // Winter wood not covered.
+  if (ctx.village.woodStore < winterWood) {
+    if (foodUrgency >= 0.7) return 0.6;  // below hunt (0.7), above play
+    return 1.0;                           // food secure → top priority chopping
+  }
+  // Winter covered, just need house wood.
+  if (ctx.villageNeedsHouses && ctx.village.woodStore < winterWood + ECONOMY.wood.houseCost) {
+    return foodUrgency >= 0.7 ? 0.5 : 0.95;
+  }
+  return 0;
 }
 
 // Gold mining — always active while gold exists on the map. Never idle when there's

@@ -809,12 +809,22 @@ function migrateAnimals(
   }
 }
 
-/** Seasonal fruit tree cycle: winter drops, spring/summer fruiting. */
-function updateTreeSeasons(trees: Tree[], currentSeason: number, isWinter: boolean): Tree[] {
+/** Stumps regrow into trees after this many ticks (~1 game-year). Without regrowth,
+ * a tribe with winter wood consumption strips the whole forest within a few cycles. */
+const STUMP_REGROW_TICKS = 2400;
+
+/** Seasonal fruit tree cycle + stump regrowth. */
+function updateTreeSeasons(trees: Tree[], currentSeason: number, isWinter: boolean, tickNum: number): Tree[] {
   const isSpring = currentSeason === 0;
   const isSummer = currentSeason === 1;
   return trees.map(t => {
-    if (t.chopped) return t;
+    if (t.chopped) {
+      // Regrow after STUMP_REGROW_TICKS. Preserves identity; fruit state resets.
+      if (t.choppedAt !== undefined && tickNum - t.choppedAt >= STUMP_REGROW_TICKS) {
+        return { ...t, chopped: false, choppedAt: undefined, fruitPortions: 0, hasFruit: false };
+      }
+      return t;
+    }
     if (isWinter && t.hasFruit) {
       if (Math.random() < 0.02) return { ...t, fruitPortions: 0, hasFruit: false };
     }
@@ -1166,7 +1176,7 @@ export function tick(state: WorldState): WorldState {
   migrateAnimals(animals, biomes, gridSize, tickNum, generateId);
 
   // --- Step 6: Seasonal tree cycle + grass regrowth ---
-  trees = updateTreeSeasons(trees, currentSeason, isWinter);
+  trees = updateTreeSeasons(trees, currentSeason, isWinter, tickNum);
   regrowGrass(grass, biomes, gridSize);
 
   // --- Step 7b: Homeless adults claim house slots ---
