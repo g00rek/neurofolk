@@ -119,6 +119,13 @@ export const ECONOMY = {
     depositCapacity: 6,      // portions per deposit (= 3 mining sessions)
     spawnBase: 3,            // base deposit count on 30×30 (scaled by map area)
   },
+  // --- WINTER (passive phase consumption) ---
+  // Per-person-per-passive-year drain. Calibrated so that a tribe of 10 adults
+  // with 3-year skip needs ~6000 energy of food + 60 wood to survive.
+  winter: {
+    foodEnergyPerPersonPerYear: 200,
+    woodPerPersonPerYear: 2,
+  },
   // --- REPRODUCTION (pregnancy, cooldowns, mortality) ---
   // Cycle math: pregnancyTicks + birthCooldown = ticks per child (best case).
   // TICKS_PER_YEAR = 2400. With current values: 600 + 900 = 1500 = 0.625 year/child.
@@ -191,6 +198,8 @@ export const RUNTIME_CONFIG = {
   grazeEnergy: 12,        // energy gained from eating one grass portion
   animalFleeRange: 4,     // manhattan distance at which animals spot humans and panic
   animalPanicDuration: 10, // ticks an animal stays in panic after last sighting
+  activePhaseTicks: 800,
+  passivePhaseYears: 3,
 };
 
 // Load saved RUNTIME_CONFIG from localStorage. Call at app startup (before world creation).
@@ -287,6 +296,50 @@ export interface LogEntry {
   detail?: string;
 }
 
+export interface Stockpile {
+  meat: number;
+  plant: number;
+  cookedMeat: number;
+  driedFruit: number;
+  wood: number;
+  gold: number;
+}
+
+export interface BirthRecord {
+  babyId: string;
+  babyName: string;
+  babyGender: Gender;
+  motherId: string;
+  motherName: string;
+  fatherId?: string;
+  fatherName?: string;
+}
+
+export interface DeathRecord {
+  entityId: string;
+  name: string;
+  gender: Gender;
+  ageYears: number;
+  cause: DeathCause;
+  detail?: string;
+}
+
+export interface TribeSummary {
+  tribe: TribeId;
+  births: BirthRecord[];
+  deaths: DeathRecord[];
+  stockpileBefore: Stockpile;
+  stockpileAfter: Stockpile;
+}
+
+export interface PassiveSummary {
+  endedAtTick: number;
+  passivePhaseYears: number;
+  perTribe: TribeSummary[];
+}
+
+export type Phase = 'active' | 'passive' | 'summary';
+
 export const FOREST_SPEED_PENALTY = 1; // reduce steps by this in forest
 
 export const NEAR_HOME_RANGE = 2; // manhattan distance to consider "near settlement"
@@ -305,4 +358,7 @@ export interface WorldState {
   tick: number;
   gridSize: number;
   log: LogEntry[];
+  phase: Phase;
+  phaseTick: number;
+  lastPassiveSummary?: PassiveSummary;
 }

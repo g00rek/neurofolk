@@ -67,7 +67,7 @@ describe('mining flow', () => {
         meatStore: 99, plantStore: 99, cookedMeatStore: 99, driedFruitStore: 99,
         woodStore: 99, goldStore: 0,
       }],
-      grass: emptyGrass(10), log: [],
+      grass: emptyGrass(10), log: [], phase: 'active' as const, phaseTick: 0,
       goldDeposits: [{ id: 'g1', position: { x: 5, y: 5 }, remaining: 6 }],
       entities: [{
         id: 'm1', name: 'Miner', position: { x: 4, y: 5 }, gender: 'male',
@@ -104,7 +104,7 @@ describe('gold deposit', () => {
         meatStore: 99, plantStore: 99, cookedMeatStore: 99, driedFruitStore: 99,
         woodStore: 99, goldStore: 0,
       }],
-      grass: emptyGrass(10), log: [], goldDeposits: [],
+      grass: emptyGrass(10), log: [], phase: 'active' as const, phaseTick: 0, goldDeposits: [],
       entities: [{
         id: 'm1', name: 'Miner', position: { x: 2, y: 3 }, gender: 'male',
         activity: { kind: 'moving', purpose: 'deposit', target: { x: 2, y: 2 }, pace: 'walk', setTick: 0 },
@@ -132,7 +132,7 @@ describe('gold end-to-end', () => {
         meatStore: 999, plantStore: 999, cookedMeatStore: 999, driedFruitStore: 999,
         woodStore: 999, goldStore: 0,
       }],
-      grass: emptyGrass(12), log: [],
+      grass: emptyGrass(12), log: [], phase: 'active' as const, phaseTick: 0,
       goldDeposits: [{ id: 'g1', position: { x: 6, y: 6 }, remaining: 6 }],
       entities: [{
         id: 'm1', name: 'Miner', position: { x: 2, y: 2 }, gender: 'male',
@@ -160,7 +160,7 @@ describe('gold depletion', () => {
         meatStore: 999, plantStore: 999, cookedMeatStore: 999, driedFruitStore: 999,
         woodStore: 999, goldStore: 0,
       }],
-      grass: emptyGrass(10), log: [],
+      grass: emptyGrass(10), log: [], phase: 'active' as const, phaseTick: 0,
       goldDeposits: [{ id: 'g1', position: { x: 5, y: 5 }, remaining: 6 }],
       entities: [{
         id: 'm1', name: 'Miner', position: { x: 1, y: 1 }, gender: 'male',

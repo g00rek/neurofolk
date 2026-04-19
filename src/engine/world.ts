@@ -501,7 +501,7 @@ export function createWorld(options: CreateWorldOptions): WorldState {
     });
   }
 
-  return { entities, animals, trees, goldDeposits, houses: [], biomes, villages, grass, tick: 0, gridSize, log: [] };
+  return { entities, animals, trees, goldDeposits, houses: [], biomes, villages, grass, tick: 0, gridSize, log: [], phase: 'active', phaseTick: 0 };
 }
 
 // starvationContext moved to demography.ts
@@ -1193,5 +1193,5 @@ export function tick(state: WorldState): WorldState {
   entities = moveChildren(entities, updatedVillages, biomes, gridSize, blockedTiles);
 
   const fullLog = [...state.log, ...log];
-  return { entities, animals, trees, goldDeposits, houses, biomes, villages: updatedVillages, grass, tick: tickNum, gridSize, log: fullLog };
+  return { entities, animals, trees, goldDeposits, houses, biomes, villages: updatedVillages, grass, tick: tickNum, gridSize, log: fullLog, phase: state.phase, phaseTick: state.phaseTick, lastPassiveSummary: state.lastPassiveSummary };
 }
