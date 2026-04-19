@@ -419,8 +419,12 @@ export function computePassivePhase(
     stockpileAfter: snapshotStockpile(v),
   }));
 
+  // Advance world.tick to reflect the time elapsed during the Long Winter — otherwise
+  // the calendar year display stays frozen across passive phases.
+  const nextTick = world.tick + years * TICKS_PER_YEAR;
+
   const summary: PassiveSummary = {
-    endedAtTick: world.tick,
+    endedAtTick: nextTick,
     passivePhaseYears: years,
     perTribe,
   };
@@ -431,6 +435,7 @@ export function computePassivePhase(
     houses,
     villages,
     log,
+    tick: nextTick,
     phase: 'summary',
     phaseTick: 0,
     lastPassiveSummary: summary,

@@ -17,40 +17,36 @@ function topUpStockpiles(world: WorldState): WorldState {
 describe('simulation smoke tests', () => {
   it('runs 1 year (2400 ticks) without crashing', () => {
     let world = createWorld({ gridSize: 30, entityCount: 6, villageCount: 1 });
-    // Pre-populate stockpiles so the passive phase does not starve everyone.
     world = topUpStockpiles(world);
-    for (let i = 0; i < TICKS_PER_YEAR; i++) {
+    // Loop until world.tick has advanced at least one in-game year. Each active-phase
+    // tick bumps world.tick by 1; each passive phase bumps it by passivePhaseYears * TICKS_PER_YEAR.
+    let activeTicks = 0;
+    while (world.tick < TICKS_PER_YEAR && activeTicks < 50_000) {
       world = tick(world);
-      // After a passive-phase summary the world pauses at phase='summary'.
-      // Resume (simulating what the worker does) so the tick loop can continue.
+      activeTicks++;
       if (world.phase === 'summary') {
         world = { ...world, phase: 'active', phaseTick: 0 };
-        // Re-stock so subsequent passive phases also have adequate food/wood.
         world = topUpStockpiles(world);
       }
     }
-    expect(world.tick).toBe(TICKS_PER_YEAR);
+    expect(world.tick).toBeGreaterThanOrEqual(TICKS_PER_YEAR);
     expect(world.entities.length).toBeGreaterThan(0);
   });
 
   it('runs 5 years without crash — population survives', () => {
-    // Use a smaller world to keep the test fast while still exercising multiple
-    // passive phase transitions (every 800 ticks → ~7-8 transitions over 5 years).
     let world = createWorld({ gridSize: 15, entityCount: 4, villageCount: 1 });
-    // Pre-populate stockpiles so passive phases do not starve everyone.
     world = topUpStockpiles(world);
-    const ticks = TICKS_PER_YEAR * 5;
-    for (let i = 0; i < ticks; i++) {
+    const targetTick = TICKS_PER_YEAR * 5;
+    let activeTicks = 0;
+    while (world.tick < targetTick && activeTicks < 200_000) {
       world = tick(world);
-      // After a passive-phase summary the world pauses at phase='summary'.
-      // Resume (simulating what the worker does) so the tick loop can continue.
+      activeTicks++;
       if (world.phase === 'summary') {
         world = { ...world, phase: 'active', phaseTick: 0 };
-        // Re-stock so subsequent passive phases also have adequate food/wood.
         world = topUpStockpiles(world);
       }
     }
-    expect(world.tick).toBe(ticks);
+    expect(world.tick).toBeGreaterThanOrEqual(targetTick);
     expect(world.entities.length).toBeGreaterThanOrEqual(1);
   }, 60_000);
 });

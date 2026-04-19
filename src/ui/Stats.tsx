@@ -93,28 +93,17 @@ export function Stats({ world }: StatsProps) {
       <div style={panelStyle}>
         <div style={labelStyle}>Time</div>
         {(() => {
-          const ticksPerMonth = TICKS_PER_DAY * 10; // 100 ticks/month
-          const month = Math.floor((world.tick % TICKS_PER_YEAR) / ticksPerMonth);
-          const seasonIdx = Math.floor(month / 3);
-          const seasons = ['Spring', 'Summer', 'Autumn', 'Winter'];
-          const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-          const dayInMonth = Math.floor((world.tick % ticksPerMonth) / TICKS_PER_DAY) + 1;
+          // Day count within current active phase (1-indexed for display).
+          const activeDay = Math.floor(world.phaseTick / TICKS_PER_DAY) + 1;
+          const activeDays = Math.ceil(RUNTIME_CONFIG.activePhaseTicks / TICKS_PER_DAY);
           return (
             <>
               <div style={{ fontSize: '20px', fontWeight: 'bold' }}>Year {year}</div>
-              <div style={{ fontSize: '13px', color: '#ccc', marginTop: '2px' }}>
-                {seasons[seasonIdx]} — {monthNames[month]}
-              </div>
-              <div style={{ fontSize: '11px', color: '#e0af68', marginTop: '2px' }}>
+              <div style={{ fontSize: '13px', color: world.phase === 'active' ? '#e0af68' : '#7aa2f7', marginTop: '2px' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   <Sun size={12} />
-                  Day {dayInMonth}
+                  {world.phase === 'active' ? `Lato — Day ${activeDay}/${activeDays}` : 'Długa Zima'}
                 </span>
-              </div>
-              <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>
-                {world.phase === 'active'
-                  ? `Lato — ${world.phaseTick}/${RUNTIME_CONFIG.activePhaseTicks}t`
-                  : 'Długa Zima (podsumowanie)'}
               </div>
             </>
           );

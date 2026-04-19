@@ -1,113 +1,82 @@
 import { createWorld, tick } from './world';
-import { TICKS_PER_YEAR } from './types';
+import { RUNTIME_CONFIG } from './types';
+import type { Entity, WorldState } from './types';
 
-const RUNS = 20;
-const MAX_TICKS = 48000; // 20 years
-const GRID = 30;
-const ENTITIES = 4;
+const RUNS = 3;
+const MAX_TICKS = 8000;
+const GRID = 25;
+const ENTITIES = 6;
 const VILLAGES = 1;
 
-interface RunResult {
-  run: number;
-  extinctTick: number | null;
-  extinctYear: number | null;
-  peakPop: number;
-  births: number;
-  deaths: { total: number; oldAge: number; starvation: number; fight: number; childbirth: number; noHome: number };
-  houses: number;
-  finalPop: number;
-  pregnant: number;
-  timeline: string[];
+function activityLabel(e: Entity): string {
+  const a = e.activity;
+  if (a.kind === 'idle') return 'idle';
+  if (a.kind === 'moving') return `→${a.purpose}`;
+  return a.action;
 }
 
-const results: RunResult[] = [];
+function activityCounts(world: WorldState): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const e of world.entities) {
+    const k = activityLabel(e);
+    out[k] = (out[k] ?? 0) + 1;
+  }
+  return out;
+}
+
+function snapshot(world: WorldState): string {
+  const v = world.villages[0];
+  const counts = activityCounts(world);
+  const actList = Object.entries(counts)
+    .map(([k, n]) => `${k}:${n}`)
+    .join(' ');
+  const pop = world.entities.length;
+  const m = world.entities.filter(e => e.gender === 'male').length;
+  const f = pop - m;
+  const phase = world.phase === 'active'
+    ? `act ${world.phaseTick}/${RUNTIME_CONFIG.activePhaseTicks}`
+    : 'SUMMARY';
+  const treesAlive = world.trees.filter(t => !t.chopped).length;
+  const treesChopped = world.trees.length - treesAlive;
+  return `t${world.tick}[${phase}] pop=${pop}(M${m}F${f}) meat=${v?.meatStore ?? 0}+${v?.cookedMeatStore ?? 0}c plant=${v?.plantStore ?? 0}+${v?.driedFruitStore ?? 0}d wood=${v?.woodStore ?? 0} gold=${v?.goldStore ?? 0} animals=${world.animals.length} trees=${treesAlive}live+${treesChopped}stumps [${actList}]`;
+}
 
 for (let r = 0; r < RUNS; r++) {
+  console.log(`\n===== Run ${r + 1} =====`);
   let world = createWorld({ gridSize: GRID, entityCount: ENTITIES, villageCount: VILLAGES });
-  let peakPop = ENTITIES;
-  const timeline: string[] = [];
-  let lastLogYear = -1;
+  console.log(`Start: ${snapshot(world)}`);
 
   for (let t = 0; t < MAX_TICKS; t++) {
+    const prevPhase = world.phase;
     world = tick(world);
-    if (world.entities.length > peakPop) peakPop = world.entities.length;
 
-    const year = Math.floor(world.tick / TICKS_PER_YEAR);
-    if (year !== lastLogYear) {
-      lastLogYear = year;
-      const m = world.entities.filter(e => e.gender === 'male').length;
-      const f = world.entities.filter(e => e.gender === 'female').length;
-      const preg = world.entities.filter(e => e.pregnancyTimer > 0).length;
-      const v = world.villages[0];
-      timeline.push(`Y${year}: pop=${world.entities.length}(M${m}F${f}) preg=${preg} houses=${world.houses.length} meat=${v?.meatStore ?? 0} plant=${v?.plantStore ?? 0} cooked=${(v?.cookedMeatStore ?? 0)+(v?.driedFruitStore ?? 0)} wood=${v?.woodStore ?? 0} animals=${world.animals.length}`);
+    // Log every 200 ticks during active, plus every phase transition and every summary.
+    if (world.tick % 200 === 0 || world.phase !== prevPhase) {
+      console.log(`  ${snapshot(world)}`);
     }
 
-    if (world.entities.length === 0) break;
+    // When a passive summary just fired, dump it and advance past it.
+    if (world.phase === 'summary' && world.lastPassiveSummary) {
+      const s = world.lastPassiveSummary;
+      for (const ts of s.perTribe) {
+        const ago = `${ts.stockpileBefore.cookedMeat}c+${ts.stockpileBefore.meat}m+${ts.stockpileBefore.wood}w`;
+        const aft = `${ts.stockpileAfter.cookedMeat}c+${ts.stockpileAfter.meat}m+${ts.stockpileAfter.wood}w`;
+        const causes: Record<string, number> = {};
+        for (const d of ts.deaths) causes[d.cause] = (causes[d.cause] ?? 0) + 1;
+        const causeStr = Object.entries(causes).map(([k, n]) => `${k}:${n}`).join(' ');
+        console.log(`  [WINTER tribe=${ts.tribe}] births=${ts.births.length} deaths=${ts.deaths.length} (${causeStr}) stock ${ago} → ${aft}`);
+      }
+      // Advance phase (simulating UI click).
+      world = { ...world, phase: 'active', phaseTick: 0 };
+    }
+
+    if (world.entities.length === 0) {
+      console.log(`  EXTINCT at ${snapshot(world)}`);
+      break;
+    }
   }
 
-  const log = world.log;
-  const deaths = log.filter(l => l.type === 'death');
-  const births = log.filter(l => l.type === 'birth');
-  const starvDeaths = deaths.filter(d => d.cause === 'starvation');
-  // Separate no-home baby deaths (starvation at age 0) from real starvation
-  const noHomeBabyDeaths = starvDeaths.filter(d => d.age === 0).length;
-  const realStarvation = starvDeaths.length - noHomeBabyDeaths;
-
-  results.push({
-    run: r + 1,
-    extinctTick: world.entities.length === 0 ? world.tick : null,
-    extinctYear: world.entities.length === 0 ? Math.floor(world.tick / TICKS_PER_YEAR) : null,
-    peakPop,
-    births: births.length,
-    deaths: {
-      total: deaths.length,
-      oldAge: deaths.filter(d => d.cause === 'old_age').length,
-      starvation: realStarvation,
-      fight: deaths.filter(d => d.cause === 'fight').length,
-      childbirth: deaths.filter(d => d.cause === 'childbirth').length,
-      noHome: noHomeBabyDeaths,
-    },
-    houses: world.houses.length,
-    finalPop: world.entities.length,
-    pregnant: world.entities.filter(e => e.pregnancyTimer > 0).length,
-    timeline,
-  });
-}
-
-// Summary
-console.log(`=== BATCH RESULTS (${RUNS} runs, ${GRID}x${GRID}, 1 village, ${ENTITIES} adults, 20 years max) ===\n`);
-
-for (const r of results) {
-  const status = r.extinctTick ? `EXTINCT Y${r.extinctYear} (tick ${r.extinctTick})` : `ALIVE pop=${r.finalPop}`;
-  console.log(`Run ${r.run}: ${status} | peak=${r.peakPop} | births=${r.births} | deaths=${r.deaths.total} (age=${r.deaths.oldAge} starv=${r.deaths.starvation} fight=${r.deaths.fight} birth=${r.deaths.childbirth} noHome=${r.deaths.noHome}) | houses=${r.houses}`);
-}
-
-console.log('\n=== TIMELINES ===\n');
-for (const r of results) {
-  console.log(`--- Run ${r.run} ---`);
-  for (const line of r.timeline) {
-    console.log(`  ${line}`);
+  if (world.entities.length > 0) {
+    console.log(`  FINAL: ${snapshot(world)}`);
   }
-  console.log('');
 }
-
-const extinct = results.filter(r => r.extinctTick !== null);
-const alive = results.filter(r => r.extinctTick === null);
-console.log(`\n=== SUMMARY ===`);
-console.log(`Extinct: ${extinct.length}/${RUNS}`);
-if (extinct.length > 0) {
-  const avgExtinctYear = extinct.reduce((s, r) => s + (r.extinctYear ?? 0), 0) / extinct.length;
-  console.log(`Avg extinction year: ${avgExtinctYear.toFixed(1)}`);
-}
-if (alive.length > 0) {
-  const avgPop = alive.reduce((s, r) => s + r.finalPop, 0) / alive.length;
-  console.log(`Avg surviving pop: ${avgPop.toFixed(1)}`);
-}
-const avgPeak = results.reduce((s, r) => s + r.peakPop, 0) / RUNS;
-const avgBirths = results.reduce((s, r) => s + r.births, 0) / RUNS;
-const avgNoHome = results.reduce((s, r) => s + r.deaths.noHome, 0) / RUNS;
-const avgStarv = results.reduce((s, r) => s + r.deaths.starvation, 0) / RUNS;
-console.log(`Avg peak pop: ${avgPeak.toFixed(1)}`);
-console.log(`Avg births: ${avgBirths.toFixed(1)}`);
-console.log(`Avg no-home baby deaths: ${avgNoHome.toFixed(1)}`);
-console.log(`Avg starvation deaths: ${avgStarv.toFixed(1)}`);
