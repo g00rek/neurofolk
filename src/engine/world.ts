@@ -1193,5 +1193,16 @@ export function tick(state: WorldState): WorldState {
   entities = moveChildren(entities, updatedVillages, biomes, gridSize, blockedTiles);
 
   const fullLog = [...state.log, ...log];
-  return { entities, animals, trees, goldDeposits, houses, biomes, villages: updatedVillages, grass, tick: tickNum, gridSize, log: fullLog, phase: state.phase, phaseTick: state.phaseTick, lastPassiveSummary: state.lastPassiveSummary };
+  return {
+    ...state,
+    entities,
+    animals,
+    trees,
+    goldDeposits,
+    houses,
+    villages: updatedVillages,
+    grass,
+    tick: tickNum,
+    log: fullLog,
+  };
 }
