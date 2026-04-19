@@ -8,6 +8,7 @@ import {
   VILLAGE_EAT_RANGE,
   TICKS_PER_YEAR,
   ECONOMY,
+  RUNTIME_CONFIG,
 } from './types';
 import { ageInYears, isPregnant } from './world';
 import { isValidBuildSite } from './action-resolver';
@@ -90,7 +91,11 @@ export function precomputeContext(
       + v.cookedMeatStore   * ECONOMY.cooking.cookedMeatEnergyPerUnit
       + v.plantStore        * ECONOMY.fruit.energyPerUnit
       + v.driedFruitStore   * ECONOMY.cooking.driedFruitEnergyPerUnit;
-    daysOfFoodByTribe.set(v.tribe, energyPerDay > 0 ? stockpileEnergy / energyPerDay : Infinity);
+    // Winter-aware: reserve the upcoming Long Winter's food first. daysOfFood reports
+    // only the *surplus* beyond winter needs — so men keep hunting until winter is secured.
+    const winterFoodNeeded = (adults + toddlers) * RUNTIME_CONFIG.passivePhaseYears * ECONOMY.winter.foodEnergyPerPersonPerYear;
+    const surplusEnergy = Math.max(0, stockpileEnergy - winterFoodNeeded);
+    daysOfFoodByTribe.set(v.tribe, energyPerDay > 0 ? surplusEnergy / energyPerDay : Infinity);
 
     if (needs && v.stockpile) {
       const anchor = v.stockpile;
@@ -688,7 +693,10 @@ export function buildAIContext(
       + village.cookedMeatStore   * ECONOMY.cooking.cookedMeatEnergyPerUnit
       + village.plantStore        * ECONOMY.fruit.energyPerUnit
       + village.driedFruitStore   * ECONOMY.cooking.driedFruitEnergyPerUnit;
-    daysOfFood = energyPerDay > 0 ? stockpileEnergy / energyPerDay : Infinity;
+    // Reserve Long Winter's food before computing surplus days (see precomputeContext).
+    const winterFoodNeeded = (adults + toddlers) * RUNTIME_CONFIG.passivePhaseYears * ECONOMY.winter.foodEnergyPerPersonPerYear;
+    const surplusEnergy = Math.max(0, stockpileEnergy - winterFoodNeeded);
+    daysOfFood = energyPerDay > 0 ? surplusEnergy / energyPerDay : Infinity;
   } else {
     daysOfFood = Infinity;
   }
