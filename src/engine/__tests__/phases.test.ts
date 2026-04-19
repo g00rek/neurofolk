@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ageAll, applyOldAgeDeaths, applyConsumption, applyStarvationDeaths } from '../phases';
+import { ageAll, applyOldAgeDeaths, applyConsumption, applyStarvationDeaths, runMatingRound } from '../phases';
 import { TICKS_PER_YEAR } from '../types';
 import type { Entity, House, LogEntry, DeathRecord, Village } from '../types';
 
@@ -130,5 +130,52 @@ describe('applyStarvationDeaths', () => {
     const entities = [makeEntity({ id: 'a', tribe: 0, energy: 10 })];
     const alive = applyStarvationDeaths(entities, 0, 0, [], 0, [], []);
     expect(alive).toHaveLength(1);
+  });
+});
+
+describe('runMatingRound', () => {
+  it('pairs each eligible woman with highest-attractiveness man in tribe', () => {
+    const entities = [
+      makeEntity({ id: 'w1', tribe: 0, gender: 'female', age: 20 * TICKS_PER_YEAR, energy: 80 }),
+      makeEntity({ id: 'w2', tribe: 0, gender: 'female', age: 25 * TICKS_PER_YEAR, energy: 80 }),
+      makeEntity({ id: 'm1', tribe: 0, gender: 'male', age: 30 * TICKS_PER_YEAR,
+        traits: { strength: 90, dexterity: 80, intelligence: 70 } }),
+      makeEntity({ id: 'm2', tribe: 0, gender: 'male', age: 30 * TICKS_PER_YEAR,
+        traits: { strength: 30, dexterity: 20, intelligence: 10 } }),
+    ];
+    const log: LogEntry[] = [];
+    const updated = runMatingRound(entities, log, 0);
+    const w1 = updated.find(e => e.id === 'w1')!;
+    const w2 = updated.find(e => e.id === 'w2')!;
+    expect(w1.pregnancyTimer).toBe(1);
+    expect(w2.pregnancyTimer).toBe(1);
+    expect(w1.fatherTraits).toEqual({ strength: 90, dexterity: 80, intelligence: 70 });
+    expect(w2.fatherTraits).toEqual({ strength: 90, dexterity: 80, intelligence: 70 });
+  });
+
+  it('skips women under 12, over 40, low energy, already pregnant', () => {
+    const entities = [
+      makeEntity({ id: 'young', gender: 'female', age: 10 * TICKS_PER_YEAR, energy: 80 }),
+      makeEntity({ id: 'old', gender: 'female', age: 45 * TICKS_PER_YEAR, energy: 80 }),
+      makeEntity({ id: 'weak', gender: 'female', age: 20 * TICKS_PER_YEAR, energy: 50 }),
+      makeEntity({ id: 'preg', gender: 'female', age: 20 * TICKS_PER_YEAR, energy: 80, pregnancyTimer: 100 }),
+      makeEntity({ id: 'm', gender: 'male', age: 30 * TICKS_PER_YEAR }),
+    ];
+    const updated = runMatingRound(entities, [], 0);
+    for (const id of ['young', 'old', 'weak']) {
+      const e = updated.find(x => x.id === id)!;
+      expect(e.pregnancyTimer).toBe(0);
+    }
+    // 'preg' retains existing pregnancyTimer
+    expect(updated.find(e => e.id === 'preg')!.pregnancyTimer).toBe(100);
+  });
+
+  it('no mating in a tribe with zero eligible men', () => {
+    const entities = [
+      makeEntity({ id: 'w', tribe: 0, gender: 'female', age: 20 * TICKS_PER_YEAR, energy: 80 }),
+      makeEntity({ id: 'boy', tribe: 0, gender: 'male', age: 8 * TICKS_PER_YEAR }),
+    ];
+    const updated = runMatingRound(entities, [], 0);
+    expect(updated.find(e => e.id === 'w')!.pregnancyTimer).toBe(0);
   });
 });

@@ -7,7 +7,7 @@
  */
 
 import type { Entity, House, LogEntry, DeathRecord, Village, TribeId } from './types';
-import { TICKS_PER_YEAR, ECONOMY } from './types';
+import { TICKS_PER_YEAR, ECONOMY, MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE } from './types';
 
 /** Age every entity by `years` Earth-years. Returns new array; does not mutate input. */
 export function ageAll(entities: Entity[], years: number): Entity[] {
@@ -138,4 +138,51 @@ export function applyStarvationDeaths(
   }
 
   return entities.filter(e => !doomedIds.has(e.id));
+}
+
+function attractiveness(e: Entity): number {
+  return (e.traits.strength + e.traits.dexterity + e.traits.intelligence) / 3;
+}
+
+/**
+ * Pair every eligible woman with the highest-attractiveness man of her tribe.
+ * Sets pregnancyTimer = 1 (sentinel), stores fatherTraits/fatherTribe.
+ * Returns new entity array; does not mutate input.
+ */
+export function runMatingRound(
+  entities: Entity[],
+  log: LogEntry[],
+  tickNum: number,
+): Entity[] {
+  const topMaleByTribe = new Map<TribeId, Entity>();
+  for (const e of entities) {
+    if (e.gender !== 'male') continue;
+    const ageYears = Math.floor(e.age / TICKS_PER_YEAR);
+    if (ageYears < MIN_REPRODUCTIVE_AGE || ageYears > MAX_REPRODUCTIVE_AGE) continue;
+    const current = topMaleByTribe.get(e.tribe);
+    if (!current || attractiveness(e) > attractiveness(current)) {
+      topMaleByTribe.set(e.tribe, e);
+    }
+  }
+
+  return entities.map(e => {
+    if (e.gender !== 'female') return e;
+    const ageYears = Math.floor(e.age / TICKS_PER_YEAR);
+    if (ageYears < MIN_REPRODUCTIVE_AGE || ageYears > MAX_REPRODUCTIVE_AGE) return e;
+    if (e.pregnancyTimer > 0) return e;
+    if (e.energy < ECONOMY.reproduction.pregnancyMinEnergy) return e;
+    const mate = topMaleByTribe.get(e.tribe);
+    if (!mate) return e;
+    log.push({
+      tick: tickNum, type: 'pregnant',
+      entityId: e.id, name: e.name, gender: e.gender, age: e.age,
+      detail: `father: ${mate.name}`,
+    });
+    return {
+      ...e,
+      pregnancyTimer: 1,
+      fatherTraits: { ...mate.traits },
+      fatherTribe: mate.tribe,
+    };
+  });
 }
