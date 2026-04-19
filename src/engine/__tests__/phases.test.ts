@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { ageAll, applyOldAgeDeaths, applyConsumption, applyStarvationDeaths, runMatingRound } from '../phases';
+import { ageAll, applyOldAgeDeaths, applyConsumption, applyStarvationDeaths, runMatingRound, resolveBirths } from '../phases';
 import { TICKS_PER_YEAR } from '../types';
-import type { Entity, House, LogEntry, DeathRecord, Village } from '../types';
+import type { Entity, House, LogEntry, DeathRecord, Village, BirthRecord } from '../types';
+import { vi } from 'vitest';
 
 function makeEntity(overrides: Partial<Entity> = {}): Entity {
   return {
@@ -177,5 +178,82 @@ describe('runMatingRound', () => {
     ];
     const updated = runMatingRound(entities, [], 0);
     expect(updated.find(e => e.id === 'w')!.pregnancyTimer).toBe(0);
+  });
+});
+
+describe('resolveBirths', () => {
+  it('creates baby entity per pregnant woman when rolls favor survival', () => {
+    // Force Math.random = 0.99 → infant survives (< 0.30 = die), mother survives (< 0.05 = die).
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const entities = [
+      makeEntity({
+        id: 'mom', gender: 'female', tribe: 0, age: 25 * TICKS_PER_YEAR,
+        pregnancyTimer: 1,
+        fatherTraits: { strength: 70, dexterity: 60, intelligence: 50 },
+        fatherTribe: 0,
+        homeId: 'h1',
+        position: { x: 5, y: 5 },
+      }),
+    ];
+    const houses: House[] = [{ id: 'h1', position: { x: 4, y: 4 }, tribe: 0, occupants: ['mom'] }];
+    const log: LogEntry[] = [];
+    const births: BirthRecord[] = [];
+    const deaths: DeathRecord[] = [];
+    let nextId = 1000;
+    const genId = () => `baby-${nextId++}`;
+    const result = resolveBirths(entities, houses, 500, log, births, deaths, genId);
+    // Mother alive, no longer pregnant.
+    const mom = result.find(e => e.id === 'mom')!;
+    expect(mom.pregnancyTimer).toBe(0);
+    expect(mom.fatherTraits).toBeUndefined();
+    // Baby created with age 0.
+    const baby = result.find(e => e.id !== 'mom')!;
+    expect(baby.age).toBe(0);
+    expect(baby.motherId).toBe('mom');
+    expect(births).toHaveLength(1);
+    expect(deaths).toHaveLength(0);
+    spy.mockRestore();
+  });
+
+  it('kills mother on maternal mortality roll, still produces surviving baby', () => {
+    // Math.random sequence: infant roll 0.99 (survive), inheritTrait rolls (several), gender roll,
+    // maxAge rolls, then eventually maternal mortality. We need at least the first roll (infant)
+    // to be > 0.30 (survive), and the maternal roll to be < 0.05 (die).
+    // Simplest: make infant survive by returning > 0.30 and force maternal death via step sequence.
+    // We use a mock implementation that returns predictable values.
+    let callCount = 0;
+    const spy = vi.spyOn(Math, 'random').mockImplementation(() => {
+      callCount++;
+      // First call = infant mortality roll → 0.99 (survive)
+      if (callCount === 1) return 0.99;
+      // Later: force maternal mortality roll to die. We don't know which call index it is,
+      // so we use 0.01 for everything after — this lets infant survive, then eventually
+      // maternal mortality fires with 0.01 < 0.05.
+      // Note: there are many intermediate rolls (inheritTraits, gender, maxAge) — they
+      // receive 0.01 too but those are fine (they just pick specific outcomes).
+      return 0.01;
+    });
+    const entities = [
+      makeEntity({
+        id: 'mom', gender: 'female', tribe: 0, age: 25 * TICKS_PER_YEAR,
+        pregnancyTimer: 1,
+        fatherTraits: { strength: 50, dexterity: 50, intelligence: 50 },
+        fatherTribe: 0,
+      }),
+    ];
+    const deaths: DeathRecord[] = [];
+    const births: BirthRecord[] = [];
+    const result = resolveBirths(entities, [], 0, [], births, deaths, () => 'baby-1');
+    // Mother removed from result
+    expect(result.find(e => e.id === 'mom')).toBeUndefined();
+    expect(deaths.some(d => d.cause === 'childbirth')).toBe(true);
+    expect(births).toHaveLength(1);
+    spy.mockRestore();
+  });
+
+  it('does nothing for women who are not pregnant', () => {
+    const entities = [makeEntity({ id: 'a', gender: 'female', pregnancyTimer: 0 })];
+    const result = resolveBirths(entities, [], 0, [], [], [], () => 'x');
+    expect(result).toEqual(entities);
   });
 });

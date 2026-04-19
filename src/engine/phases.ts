@@ -6,8 +6,11 @@
  * aging, old-age deaths, consumption, starvation, mating, births.
  */
 
-import type { Entity, House, LogEntry, DeathRecord, Village, TribeId } from './types';
+import type {
+  Entity, House, LogEntry, DeathRecord, Village, TribeId, BirthRecord, RGB, Traits,
+} from './types';
 import { TICKS_PER_YEAR, ECONOMY, MIN_REPRODUCTIVE_AGE, MAX_REPRODUCTIVE_AGE } from './types';
+import { randomName } from './names';
 
 /** Age every entity by `years` Earth-years. Returns new array; does not mutate input. */
 export function ageAll(entities: Entity[], years: number): Entity[] {
@@ -185,4 +188,131 @@ export function runMatingRound(
       fatherTribe: mate.tribe,
     };
   });
+}
+
+function clamp(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
+}
+
+function inheritTrait(a: number, b: number, mutation: number): number {
+  const avg = (a + b) / 2;
+  return clamp(Math.round(avg + (Math.random() * mutation * 2 - mutation)), 0, 100);
+}
+
+function inheritTraits(a: Traits, b: Traits): Traits {
+  const dramaticMutation = Math.random() < 0.03;
+  const MUTATION = 6;
+  const traits: Traits = {
+    strength: inheritTrait(a.strength, b.strength, MUTATION),
+    dexterity: inheritTrait(a.dexterity, b.dexterity, MUTATION),
+    intelligence: inheritTrait(a.intelligence, b.intelligence, MUTATION),
+  };
+  if (dramaticMutation) {
+    const keys: (keyof Traits)[] = ['strength', 'dexterity', 'intelligence'];
+    const key = keys[Math.floor(Math.random() * keys.length)];
+    traits[key] = Math.random() < 0.5 ? 0 : 100;
+  }
+  return traits;
+}
+
+function randomMaxAgeTicks(): number {
+  const years = 45 + Math.floor(Math.random() * 16);
+  return years * TICKS_PER_YEAR;
+}
+
+/**
+ * Resolve all pending pregnancies (pregnancyTimer > 0). For each:
+ *   1. Roll infant mortality → baby created or not
+ *   2. Roll maternal mortality → mother removed or survives (with pregnancyTimer cleared)
+ * Returns new entity array with survivors + surviving babies. Mutates houses.
+ */
+export function resolveBirths(
+  entities: Entity[],
+  houses: House[],
+  tickNum: number,
+  log: LogEntry[],
+  births: BirthRecord[],
+  deaths: DeathRecord[],
+  generateId: () => string,
+): Entity[] {
+  const result: Entity[] = [];
+  for (const mother of entities) {
+    if (mother.pregnancyTimer <= 0) {
+      result.push(mother);
+      continue;
+    }
+    const infantDies = Math.random() < ECONOMY.reproduction.infantMortality;
+    const dadTraits = mother.fatherTraits ?? mother.traits;
+    const babyTraits = inheritTraits(dadTraits, mother.traits);
+    const babyGender: 'male' | 'female' = Math.random() < 0.5 ? 'male' : 'female';
+    const babyId = generateId();
+    const babyName = randomName(babyGender);
+
+    if (infantDies) {
+      log.push({
+        tick: tickNum, type: 'death',
+        entityId: babyId, name: babyName, gender: babyGender, age: 0,
+        cause: 'starvation', detail: 'infant mortality',
+      });
+      deaths.push({
+        entityId: babyId, name: babyName, gender: babyGender, ageYears: 0,
+        cause: 'starvation', detail: 'infant mortality',
+      });
+    } else {
+      const baby: Entity = {
+        id: babyId,
+        name: babyName,
+        position: { ...mother.position },
+        gender: babyGender,
+        activity: { kind: 'idle' },
+        age: 0,
+        maxAge: randomMaxAgeTicks(),
+        color: [...mother.color] as RGB,
+        energy: ECONOMY.metabolism.energyStart,
+        traits: babyTraits,
+        birthCooldown: 0,
+        pregnancyTimer: 0,
+        tribe: (mother.fatherTribe === mother.tribe
+          ? mother.tribe
+          : (Math.random() < 0.5 ? mother.tribe : mother.fatherTribe ?? mother.tribe)),
+        homeId: mother.homeId,
+        motherId: mother.id,
+      };
+      result.push(baby);
+      log.push({
+        tick: tickNum, type: 'birth',
+        entityId: baby.id, name: baby.name, gender: baby.gender, age: 0,
+      });
+      births.push({
+        babyId: baby.id, babyName: baby.name, babyGender: baby.gender,
+        motherId: mother.id, motherName: mother.name,
+      });
+    }
+
+    const maternalDies = Math.random() < ECONOMY.reproduction.maternalMortality;
+    if (maternalDies) {
+      log.push({
+        tick: tickNum, type: 'death',
+        entityId: mother.id, name: mother.name, gender: mother.gender, age: mother.age,
+        cause: 'childbirth',
+      });
+      deaths.push({
+        entityId: mother.id, name: mother.name, gender: mother.gender,
+        ageYears: Math.floor(mother.age / TICKS_PER_YEAR),
+        cause: 'childbirth',
+      });
+      for (const h of houses) {
+        const idx = h.occupants.indexOf(mother.id);
+        if (idx >= 0) h.occupants.splice(idx, 1);
+      }
+    } else {
+      result.push({
+        ...mother,
+        pregnancyTimer: 0,
+        fatherTraits: undefined,
+        fatherTribe: undefined,
+      });
+    }
+  }
+  return result;
 }
