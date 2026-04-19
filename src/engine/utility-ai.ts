@@ -334,7 +334,7 @@ function scoreGather(ctx: AIContext): number {
   if (ageInYears(ctx.entity) < CHILD_AGE) return 0;
   if (!ctx.village) return 0;
   if (ctx.entity.carrying && ctx.entity.carrying.amount > 0) return 0;
-  if (ctx.entity.gender === 'female' && ctx.entity.birthCooldown > 0) return 0;
+
   if (ctx.entity.pregnancyTimer > 0 && ctx.entity.pregnancyTimer < 100) return 0;
   if (!ctx.nearestFruitTree) return 0; // no fruit in sight — don't waste a turn wandering
 

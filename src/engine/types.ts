@@ -126,14 +126,11 @@ export const ECONOMY = {
     foodEnergyPerPersonPerYear: 200,
     woodPerPersonPerYear: 2,
   },
-  // --- REPRODUCTION (pregnancy, cooldowns, mortality) ---
-  // Cycle math: pregnancyTicks + birthCooldown = ticks per child (best case).
-  // TICKS_PER_YEAR = 2400. With current values: 600 + 900 = 1500 = 0.625 year/child.
-  // Theoretical max per woman (12-40 age = 28 years): ~45 pregnancies. Real rate
-  // far lower due to mating conditions + infant/maternal mortality.
+  // --- REPRODUCTION (pregnancy, mortality) ---
+  // TICKS_PER_YEAR = 2400. Theoretical max per woman (12-40 age = 28 years): many pregnancies.
+  // Real rate far lower due to mating conditions + infant/maternal mortality.
   reproduction: {
     pregnancyTicks: 400,           // ~20 days game-time (reduced from 600 to accelerate reproduction)
-    birthCooldown: 900,            // ~45 days after birth — postpartum recovery period
     infantMortality: 0.3,          // 30% chance baby dies at birth (historical pre-industrial rate)
     maternalMortality: 0.05,       // 5% chance mother dies per birth
     pregnancyMinEnergy: 60,        // woman must be well-fed (energy > this) to conceive
@@ -156,7 +153,6 @@ export interface Entity {
   tribe: TribeId;
   homeId?: string;
   motherId?: string;      // children follow her
-  birthCooldown: number;  // ticks until next pregnancy allowed
   pregnancyTimer: number; // > 0 = pregnant
   fatherTraits?: Traits;
   fatherTribe?: TribeId;

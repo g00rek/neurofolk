@@ -6,7 +6,7 @@
  *   2. processBirths — handle birth when pregnancyTimer reaches 0, including
  *      infant mortality, maternal mortality, trait inheritance, baby placement
  *
- * Age increment, birthCooldown/pregnancyTimer decrement remain in tick()'s Step 0
+ * Age increment, pregnancyTimer decrement remain in tick()'s Step 0
  * because they are tightly coupled with the metabolism map (drain + eat) in a single pass.
  */
 
@@ -147,7 +147,7 @@ export function processDeaths(
 // ── Birth processing ──
 
 export interface BirthResult {
-  /** Entities array with mothers updated (birthCooldown set, fatherTraits cleared).
+  /** Entities array with mothers updated (fatherTraits cleared).
    *  Maternal deaths already removed. Babies appended. */
   entities: Entity[];
   log: LogEntry[];
@@ -156,7 +156,7 @@ export interface BirthResult {
 /**
  * Process births for entities whose pregnancyTimer just hit 0.
  * Creates baby entities, applies infant mortality and maternal mortality.
- * Updates mother's birthCooldown and clears fatherTraits.
+ * Clears fatherTraits on the mother after birth.
  *
  * @param entities - current alive entities (after death filtering, with age/timers updated)
  * @param prevEntities - entities from previous tick (to detect pregnancyTimer transition)
@@ -204,7 +204,6 @@ export function processBirths(
       color: [...mother.color] as RGB,
       energy: ECONOMY.metabolism.energyStart,
       traits: babyTraits,
-      birthCooldown: 0,
       pregnancyTimer: 0,
       tribe: (mother.fatherTribe === mother.tribe
         ? mother.tribe
@@ -228,7 +227,7 @@ export function processBirths(
     }
 
     // Reset reproductive state on mother
-    entities[mi] = { ...mother, fatherTraits: undefined, birthCooldown: ECONOMY.reproduction.birthCooldown };
+    entities[mi] = { ...mother, fatherTraits: undefined };
 
     // Maternal mortality
     if (Math.random() < ECONOMY.reproduction.maternalMortality) {

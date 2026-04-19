@@ -408,7 +408,6 @@ export function createWorld(options: CreateWorldOptions): WorldState {
         energy: ECONOMY.metabolism.energyStart,
         traits,
         tribe,
-        birthCooldown: 0,
         pregnancyTimer: 0,
       });
     }

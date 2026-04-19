@@ -282,7 +282,6 @@ export function resolveBirths(
         color: [...mother.color] as RGB,
         energy: ECONOMY.metabolism.energyStart,
         traits: babyTraits,
-        birthCooldown: 0,
         pregnancyTimer: 0,
         tribe: (mother.fatherTribe === mother.tribe
           ? mother.tribe

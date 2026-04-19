@@ -20,7 +20,6 @@ function makeEntity(overrides: Partial<Entity> = {}): Entity {
     energy: 80,
     traits: { strength: 50, dexterity: 50, intelligence: 50 },
     tribe: 0,
-    birthCooldown: 0,
     pregnancyTimer: 0,
     ...overrides,
   };
@@ -158,7 +157,6 @@ describe('pheromoneMating', () => {
       age: 20 * T,
       energy: 80,
       homeId: 'h1',
-      birthCooldown: 0,
       pregnancyTimer: 0,
     });
 
@@ -191,7 +189,6 @@ describe('pheromoneMating', () => {
       age: 20 * T,
       energy: 30, // below pregnancyMinEnergy (60)
       homeId: 'h1',
-      birthCooldown: 0,
       pregnancyTimer: 0,
     });
 

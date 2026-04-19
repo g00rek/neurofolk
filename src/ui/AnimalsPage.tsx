@@ -356,7 +356,6 @@ function makeTestHuman(pos: Position, idx: number): Entity {
     energy: 100,
     traits: { strength: 50, dexterity: 50, intelligence: 50 },
     tribe: 0,
-    birthCooldown: 0,
     pregnancyTimer: 0,
   };
 }

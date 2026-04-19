@@ -6,14 +6,12 @@ const DAYS_PER_MONTH = 10;
 const MONTHS_PER_YEAR = 12;
 
 // Reproductive lifecycle status — orthogonal to activity state.
-// Males have no refractory period; only pregnancy + postpartum (females) gate fertility.
-type FertilityStatus = 'too young' | 'too old' | 'pregnant' | 'postpartum' | 'ready to mate';
+type FertilityStatus = 'too young' | 'too old' | 'pregnant' | 'ready to mate';
 function fertilityStatus(entity: Entity): FertilityStatus {
   const years = Math.floor(entity.age / 2400); // TICKS_PER_YEAR
   if (years < MIN_REPRODUCTIVE_AGE) return 'too young';
   if (years > MAX_REPRODUCTIVE_AGE) return 'too old';
   if (entity.pregnancyTimer > 0) return 'pregnant';
-  if (entity.birthCooldown > 0) return 'postpartum';  // female after birth, recovery
   return 'ready to mate';
 }
 
@@ -30,7 +28,6 @@ function fertilityColor(status: FertilityStatus): string {
   switch (status) {
     case 'ready to mate': return '#9ece6a'; // green
     case 'pregnant': return '#f7768e'; // pink
-    case 'postpartum': return '#bb9af7'; // purple
     case 'too young': case 'too old': return '#666'; // dim gray
   }
 }
@@ -91,7 +88,6 @@ export function EntityPanel({ entity, world, onClose }: EntityPanelProps) {
         <span style={{ color: fertilityColor(fertilityStatus(entity)) }}>
           {fertilityStatus(entity)}
           {entity.pregnancyTimer > 0 && ` (${formatDuration(entity.pregnancyTimer)} left)`}
-          {entity.birthCooldown > 0 && entity.pregnancyTimer === 0 && ` (${formatDuration(entity.birthCooldown)} left)`}
         </span>
       </div>
       <div style={rowStyle}>
@@ -136,12 +132,7 @@ export function EntityPanel({ entity, world, onClose }: EntityPanelProps) {
         <span style={dimStyle}>Home:</span>
         <span>{entity.homeId ?? 'none'}</span>
       </div>
-      {entity.gender === 'female' && entity.birthCooldown > 0 && (
-        <div style={rowStyle}>
-          <span style={dimStyle}>Birth CD:</span>
-          <span>{entity.birthCooldown}t</span>
-        </div>
-      )}
+
       <div style={rowStyle}>
         <span style={dimStyle}>Position:</span>
         <span>{entity.position.x},{entity.position.y}</span>

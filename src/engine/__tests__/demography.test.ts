@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { processDeaths, processBirths, starvationContext } from '../demography';
 import type { Entity, House, Village, RGB, Traits } from '../types';
-import { ECONOMY, TICKS_PER_YEAR } from '../types';
+import { TICKS_PER_YEAR } from '../types';
 
 const T = TICKS_PER_YEAR;
 
@@ -25,7 +25,6 @@ function makeEntity(overrides: Partial<Entity> = {}): Entity {
     energy: 80,
     traits: { strength: 50, dexterity: 50, intelligence: 50 },
     tribe: 0,
-    birthCooldown: 0,
     pregnancyTimer: 0,
     ...overrides,
   };
@@ -345,27 +344,6 @@ describe('processBirths', () => {
     expect(baby!.traits.strength).toBe(50);  // (20+80)/2
     expect(baby!.traits.dexterity).toBe(50); // (80+20)/2
     expect(baby!.traits.intelligence).toBe(50); // (40+60)/2
-  });
-
-  it('birth cooldown applied to mother after birth', () => {
-    const prevMother = makeEntity({
-      id: 'mom', gender: 'female', pregnancyTimer: 1, birthCooldown: 0,
-      fatherTraits: { strength: 50, dexterity: 50, intelligence: 50 },
-      fatherTribe: 0 as any,
-    });
-    const currentMother = makeEntity({
-      id: 'mom', gender: 'female', pregnancyTimer: 0, birthCooldown: 0,
-      fatherTraits: { strength: 50, dexterity: 50, intelligence: 50 },
-      fatherTribe: 0 as any,
-    });
-
-    const random = vi.spyOn(Math, 'random');
-    random.mockReturnValue(0.5);
-
-    const result = processBirths([currentMother], [prevMother], [], 100, testGenerateId);
-    const mom = result.entities.find(e => e.id === 'mom');
-    expect(mom).toBeDefined();
-    expect(mom!.birthCooldown).toBe(ECONOMY.reproduction.birthCooldown);
   });
 
   it('baby placed in mother\'s house if space available', () => {

@@ -155,7 +155,7 @@ export function pheromoneMating(
       if (female.gender !== 'female' || isChild(female)) continue;
       if (!isReproductive(female)) continue;
       if (isPregnant(female)) continue;
-      if (female.birthCooldown > 0) continue;
+
       if (female.tribe !== male.tribe) continue;
       if (!female.homeId) continue;
       // Must be well-fed — pregnancy requires energy reserves (realistic body-fat gate)

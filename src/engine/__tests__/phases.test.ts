@@ -11,7 +11,7 @@ function makeEntity(overrides: Partial<Entity> = {}): Entity {
     age: 10 * TICKS_PER_YEAR, maxAge: 50 * TICKS_PER_YEAR,
     color: [100, 100, 100], energy: 80,
     traits: { strength: 50, dexterity: 50, intelligence: 50 },
-    tribe: 0, birthCooldown: 0, pregnancyTimer: 0,
+    tribe: 0, pregnancyTimer: 0,
     ...overrides,
   };
 }

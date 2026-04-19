@@ -74,7 +74,7 @@ describe('mining flow', () => {
         activity: { kind: 'moving', purpose: 'mine', target: { x: 5, y: 5 }, pace: 'walk', setTick: 0 },
         age: 25 * T, maxAge: 100 * T, color: [255, 0, 0],
         energy: 80, traits: { strength: 50, dexterity: 50, intelligence: 50 },
-        tribe: 0, birthCooldown: 0, pregnancyTimer: 0,
+        tribe: 0, pregnancyTimer: 0,
       }],
     };
     // Tick once: arrival (already adjacent) → startWork('mining')
@@ -110,7 +110,7 @@ describe('gold deposit', () => {
         activity: { kind: 'moving', purpose: 'deposit', target: { x: 2, y: 2 }, pace: 'walk', setTick: 0 },
         age: 25 * T, maxAge: 100 * T, color: [255, 0, 0],
         energy: 80, traits: { strength: 50, dexterity: 50, intelligence: 50 },
-        tribe: 0, birthCooldown: 0, pregnancyTimer: 0,
+        tribe: 0, pregnancyTimer: 0,
         carrying: { type: 'gold', amount: 2 },
       }],
     };
@@ -139,7 +139,7 @@ describe('gold end-to-end', () => {
         activity: { kind: 'idle' },
         age: 25 * T, maxAge: 100 * T, color: [255, 0, 0],
         energy: 100, traits: { strength: 50, dexterity: 50, intelligence: 50 },
-        tribe: 0, birthCooldown: 0, pregnancyTimer: 0,
+        tribe: 0, pregnancyTimer: 0,
       }],
     };
     let state = world;
@@ -167,7 +167,7 @@ describe('gold depletion', () => {
         activity: { kind: 'idle' },
         age: 25 * T, maxAge: 100 * T, color: [255, 0, 0],
         energy: 100, traits: { strength: 50, dexterity: 50, intelligence: 50 },
-        tribe: 0, birthCooldown: 0, pregnancyTimer: 0,
+        tribe: 0, pregnancyTimer: 0,
       }],
     };
     let state = world;
