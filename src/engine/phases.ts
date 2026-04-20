@@ -395,6 +395,21 @@ export function computePassivePhase(
     }
   }
 
+  // 4b. Food spoilage. After a Long Winter anything beyond the starting per-person
+  // allowance rots. Survivors begin the next summer with roughly what a fresh tribe
+  // of their size would have — enough to avoid immediate starvation, not enough to
+  // coast. Cooked/dried goes to 0 (preserved food still can't survive 3+ years).
+  const STARTING_MEAT_PER_PERSON = 10 / 4;    // createWorld: meat=10 for 4 entities
+  const STARTING_PLANT_PER_PERSON = 15 / 4;   // createWorld: plant=15 for 4 entities
+  for (const v of villages) {
+    const pop = entities.filter(e => e.tribe === v.tribe).length;
+    if (pop === 0) continue;
+    v.meatStore = Math.min(v.meatStore, Math.ceil(STARTING_MEAT_PER_PERSON * pop));
+    v.plantStore = Math.min(v.plantStore, Math.ceil(STARTING_PLANT_PER_PERSON * pop));
+    v.cookedMeatStore = 0;
+    v.driedFruitStore = 0;
+  }
+
   // 5. Mating.
   entities = runMatingRound(entities, log, world.tick);
 
