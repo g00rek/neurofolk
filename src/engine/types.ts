@@ -133,7 +133,7 @@ export const ECONOMY = {
   // Real rate far lower due to mating conditions + infant/maternal mortality.
   reproduction: {
     pregnancyTicks: 400,           // ~20 days game-time (reduced from 600 to accelerate reproduction)
-    infantMortality: 0.3,          // 30% chance baby dies at birth (historical pre-industrial rate)
+    infantMortality: 0.1,          // 10% chance baby dies at birth (gameplay-tuned)
     maternalMortality: 0.025,      // 2.5% chance mother dies per birth (realistic pre-industrial)
     pregnancyMinEnergy: 60,        // woman must be well-fed (energy > this) to conceive
     infantAgeYears: 1,             // age < this = infant (breastfed, no drain, no eat)
